@@ -8,33 +8,23 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Entity
-@Table(name = "tests")
+@Table(name = "roles")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Test {
+public class Role {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
-    @JoinColumn(name = "test_type_id", nullable = false)
-    private TestType testType;
-
-    @Column(name = "name", nullable = false, length = 200)
+    @Column(name = "name", nullable = false, unique = true, length = 50)
     private String name;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "questions_to_show", nullable = false)
-    private Integer questionsToShow;
-
-    @Column(name = "active")
-    private Boolean active = true;
-
-    @OneToMany(mappedBy = "test", cascade = CascadeType.ALL)
-    private List<Question> questions;
+    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL)
+    private List<User> users;
 }
