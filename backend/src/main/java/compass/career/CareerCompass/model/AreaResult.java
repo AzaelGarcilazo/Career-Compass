@@ -5,14 +5,16 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Entity
-@Table(name = "user_answers", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"evaluation_id", "question_id"})
+@Table(name = "area_results", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"evaluation_id", "vocational_area_id"})
 })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserAnswer {
+public class AreaResult {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,10 +26,12 @@ public class UserAnswer {
     private CompletedEvaluation evaluation;
 
     @ManyToOne
-    @JoinColumn(name = "question_id", nullable = false)
-    private Question question;
+    @JoinColumn(name = "vocational_area_id", nullable = false)
+    private VocationalArea vocationalArea;
 
-    @ManyToOne
-    @JoinColumn(name = "option_id", nullable = false)
-    private AnswerOption option;
+    @Column(name = "percentage", nullable = false, precision = 5, scale = 2)
+    private BigDecimal percentage;
+
+    @Column(name = "ranking")
+    private Integer ranking;
 }

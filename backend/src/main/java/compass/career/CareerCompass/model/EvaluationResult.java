@@ -6,24 +6,21 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "sessions")
+@Table(name = "evaluation_results")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Session {
+public class EvaluationResult {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Integer id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @OneToOne
+    @JoinColumn(name = "evaluation_id", nullable = false, unique = true)
+    private CompletedEvaluation evaluation;
 
-    @Column(name = "token", nullable = false, unique = true, length = 500)
-    private String token;
-
-    @Column(name = "active")
-    private Boolean active = true;
+    @Column(name = "result_json", nullable = false, columnDefinition = "JSONB")
+    private String resultJson;
 }

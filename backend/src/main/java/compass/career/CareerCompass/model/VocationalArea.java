@@ -8,23 +8,23 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "vocational_areas")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Role {
+public class VocationalArea {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Integer id;
 
-    @Column(name = "name", nullable = false, unique = true, length = 50)
+    @Column(name = "name", nullable = false, unique = true, length = 100)
     private String name;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL)
-    private List<User> users;
+    @OneToMany(mappedBy = "vocationalArea", cascade = CascadeType.ALL)
+    private List<AreaResult> areaResults;
 }
