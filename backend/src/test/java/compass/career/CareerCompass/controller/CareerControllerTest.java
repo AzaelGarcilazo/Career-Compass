@@ -189,7 +189,7 @@ class CareerControllerTest {
     void removeFavoriteCareer_ok() throws Exception {
         // Propósito: Verificar que un usuario puede eliminar una carrera de sus
         // favoritos exitosamente, recibiendo código 204 sin body. Esto permite
-        // a los usuarios gestionar su lista de carreras de interés.
+        // a los usuarios gestionar su lista de carreras favoritas.
 
         User mockUser = mockUser(1, "user@example.com");
         when(authService.getUserFromToken(TOKEN_WITHOUT_BEARER)).thenReturn(mockUser);
