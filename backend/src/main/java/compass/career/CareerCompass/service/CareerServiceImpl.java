@@ -1,5 +1,6 @@
 package compass.career.CareerCompass.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import compass.career.CareerCompass.dto.CareerDetailResponse;
 import compass.career.CareerCompass.dto.CareerRecommendationResponse;
 import compass.career.CareerCompass.dto.FavoriteCareerRequest;
@@ -9,15 +10,19 @@ import compass.career.CareerCompass.model.*;
 import compass.career.CareerCompass.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CareerServiceImpl implements CareerService {
 
     private final CareerRepository careerRepository;
@@ -25,75 +30,141 @@ public class CareerServiceImpl implements CareerService {
     private final FavoriteCareerRepository favoriteCareerRepository;
     private final UserRepository userRepository;
     private final CompletedEvaluationRepository completedEvaluationRepository;
-    private final AreaResultRepository areaResultRepository;
+    private final EvaluationResultRepository evaluationResultRepository;
     private final SocialMediaApiService socialMediaApiService;
+    private final GroqService groqService;
+    private final ObjectMapper objectMapper;
+
+    // Caché simple de recomendaciones (1 hora)
+    private final Map<Integer, CachedRecommendations> cache = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
     public List<CareerRecommendationResponse> getRecommendedCareers(Integer userId) {
+        log.info("Generating career recommendations for user {}", userId);
+
+        // Verificar caché
+        CachedRecommendations cached = cache.get(userId);
+        if (cached != null && !cached.isExpired()) {
+            log.info("Returning cached recommendations for user {}", userId);
+            return cached.getRecommendations();
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        // Verificar si ya existen recomendaciones
+        // Verificar si ya existen recomendaciones en BD (generadas previamente)
         List<CareerRecommendation> existingRecommendations =
                 careerRecommendationRepository.findByUserIdOrderByCompatibilityPercentageDesc(userId);
 
         if (!existingRecommendations.isEmpty()) {
-            return existingRecommendations.stream()
+            log.info("Found {} existing recommendations in database for user {}", existingRecommendations.size(), userId);
+            List<CareerRecommendationResponse> responses = existingRecommendations.stream()
                     .map(CareerMapper::toRecommendationResponse)
                     .collect(Collectors.toList());
+
+            // Guardar en caché
+            cache.put(userId, new CachedRecommendations(responses));
+            return responses;
         }
 
-        // Generar nuevas recomendaciones basadas en evaluaciones
-        List<CompletedEvaluation> evaluations =
-                completedEvaluationRepository.findByUserIdOrderByCompletionDateDesc(userId);
+        // Generar nuevas recomendaciones usando Groq AI
+        log.info("Generating NEW recommendations using Groq AI for user {}", userId);
 
-        if (evaluations.isEmpty()) {
+        // 1. Obtener resultados de los tests
+        Map<String, Object> personalityResults = getTestResults(userId, "personality");
+        Map<String, Object> vocationalResults = getTestResults(userId, "vocational_interests");
+        Map<String, Object> cognitiveResults = getTestResults(userId, "cognitive_skills");
+
+        // Validar que el usuario haya completado al menos un test
+        if (personalityResults.isEmpty() && vocationalResults.isEmpty() && cognitiveResults.isEmpty()) {
             throw new IllegalStateException("User must complete at least one evaluation to get recommendations");
         }
 
-        // Obtener áreas vocacionales del usuario
-        Map<String, BigDecimal> userInterests = new HashMap<>();
-        for (CompletedEvaluation evaluation : evaluations) {
-            if ("vocational_interests".equals(evaluation.getTest().getTestType().getName())) {
-                List<AreaResult> areaResults = areaResultRepository.findByEvaluationIdOrderByRankingAsc(evaluation.getId());
-                for (AreaResult areaResult : areaResults) {
-                    String areaName = areaResult.getVocationalArea().getName();
-                    BigDecimal percentage = areaResult.getPercentage();
-                    userInterests.put(areaName, percentage);
-                }
-                break; // Tomar solo la evaluación más reciente
-            }
+        // 2. Obtener todas las carreras disponibles
+        List<Career> allCareers = careerRepository.findAll();
+        if (allCareers.isEmpty()) {
+            throw new IllegalStateException("No careers available in the system");
         }
 
-        // Obtener todas las carreras y calcular compatibilidad
-        List<Career> allCareers = careerRepository.findAll();
-        List<CareerRecommendation> recommendations = new ArrayList<>();
+        // 3. Preparar información de carreras para Groq AI
+        List<GroqService.CareerInfo> careerInfoList = allCareers.stream()
+                .map(c -> new GroqService.CareerInfo(
+                        c.getId(),
+                        c.getName(),
+                        c.getDescription(),
+                        c.getDurationSemesters(),
+                        c.getAverageSalary()
+                ))
+                .collect(Collectors.toList());
 
-        for (Career career : allCareers) {
-            // Algoritmo simple de compatibilidad basado en áreas de interés
-            BigDecimal compatibility = calculateCareerCompatibility(career, userInterests, evaluations);
+        // 4. Llamar a Groq AI para generar recomendaciones
+        List<GroqService.CareerRecommendation> aiRecommendations;
+        try {
+            aiRecommendations = groqService.generateCareerRecommendations(
+                    personalityResults,
+                    vocationalResults,
+                    cognitiveResults,
+                    careerInfoList
+            );
+        } catch (Exception e) {
+            log.error("Error generating recommendations with Groq AI", e);
+            throw new RuntimeException("Failed to generate career recommendations", e);
+        }
+
+        // 5. Guardar recomendaciones en la base de datos
+        List<CareerRecommendation> savedRecommendations = new ArrayList<>();
+        for (GroqService.CareerRecommendation aiRec : aiRecommendations) {
+            Career career = careerRepository.findById(aiRec.getCareerId())
+                    .orElseThrow(() -> new EntityNotFoundException("Career not found: " + aiRec.getCareerId()));
 
             CareerRecommendation recommendation = new CareerRecommendation();
             recommendation.setUser(user);
             recommendation.setCareer(career);
-            recommendation.setCompatibilityPercentage(compatibility);
-            recommendations.add(recommendation);
+            recommendation.setCompatibilityPercentage(BigDecimal.valueOf(aiRec.getCompatibilityPercentage()));
+
+            savedRecommendations.add(careerRecommendationRepository.save(recommendation));
         }
 
-        // Ordenar por compatibilidad y tomar mínimo 10
-        recommendations.sort(Comparator.comparing(CareerRecommendation::getCompatibilityPercentage).reversed());
-
-        // Guardar las recomendaciones
-        List<CareerRecommendation> topRecommendations = recommendations.stream()
-                .limit(Math.max(10, recommendations.size()))
-                .collect(Collectors.toList());
-
-        careerRecommendationRepository.saveAll(topRecommendations);
-
-        return topRecommendations.stream()
+        // 6. Construir respuesta
+        List<CareerRecommendationResponse> responses = savedRecommendations.stream()
                 .map(CareerMapper::toRecommendationResponse)
                 .collect(Collectors.toList());
+
+        // 7. Guardar en caché
+        cache.put(userId, new CachedRecommendations(responses));
+
+        log.info("Successfully generated and saved {} recommendations for user {}", responses.size(), userId);
+        return responses;
+    }
+
+    private Map<String, Object> getTestResults(Integer userId, String testTypeName) {
+        // Buscar evaluación más reciente del usuario para este tipo de test
+        List<CompletedEvaluation> evaluations = completedEvaluationRepository.findByUserIdOrderByCompletionDateDesc(userId);
+
+        Optional<CompletedEvaluation> relevantEvaluation = evaluations.stream()
+                .filter(e -> testTypeName.equals(e.getTest().getTestType().getName()))
+                .findFirst();
+
+        if (relevantEvaluation.isEmpty()) {
+            log.debug("User {} has not completed {} test", userId, testTypeName);
+            return Collections.emptyMap();
+        }
+
+        // Obtener resultado JSON
+        CompletedEvaluation evaluation = relevantEvaluation.get();
+        if (evaluation.getEvaluationResult() == null) {
+            log.warn("No result found for evaluation {}", evaluation.getId());
+            return Collections.emptyMap();
+        }
+
+        try {
+            String jsonResult = evaluation.getEvaluationResult().getResultJson();
+            return objectMapper.readValue(jsonResult, Map.class);
+        } catch (Exception e) {
+            log.error("Error parsing {} test results for user {}", testTypeName, userId, e);
+            return Collections.emptyMap();
+        }
     }
 
     @Override
@@ -160,44 +231,22 @@ public class CareerServiceImpl implements CareerService {
                 .collect(Collectors.toList());
     }
 
-    // Método auxiliar para calcular compatibilidad
-    private BigDecimal calculateCareerCompatibility(Career career, Map<String, BigDecimal> userInterests,
-                                                    List<CompletedEvaluation> evaluations) {
-        // Algoritmo simple: basado en coincidencia de palabras clave y áreas de interés
-        // En producción, esto podría usar IA/ML más sofisticado
+    // Clase interna para caché
+    private static class CachedRecommendations {
+        private final List<CareerRecommendationResponse> recommendations;
+        private final LocalDateTime expiresAt;
 
-        BigDecimal baseCompatibility = BigDecimal.valueOf(50); // Base 50%
-
-        // Ajustar según áreas de interés (máximo +30%)
-        BigDecimal interestBonus = BigDecimal.ZERO;
-        for (Map.Entry<String, BigDecimal> entry : userInterests.entrySet()) {
-            if (career.getDescription() != null &&
-                    career.getDescription().toLowerCase().contains(entry.getKey().toLowerCase())) {
-                interestBonus = interestBonus.add(entry.getValue().multiply(BigDecimal.valueOf(0.3)));
-            }
+        public CachedRecommendations(List<CareerRecommendationResponse> recommendations) {
+            this.recommendations = recommendations;
+            this.expiresAt = LocalDateTime.now().plusHours(1); // Caché de 1 hora
         }
 
-        // Ajustar según evaluación de personalidad (máximo +20%)
-        BigDecimal personalityBonus = BigDecimal.ZERO;
-        for (CompletedEvaluation eval : evaluations) {
-            if ("personality".equals(eval.getTest().getTestType().getName())) {
-                if (eval.getTotalScore() != null) {
-                    personalityBonus = eval.getTotalScore().multiply(BigDecimal.valueOf(0.2));
-                }
-                break;
-            }
+        public boolean isExpired() {
+            return LocalDateTime.now().isAfter(expiresAt);
         }
 
-        BigDecimal total = baseCompatibility.add(interestBonus).add(personalityBonus);
-
-        // Asegurar que esté entre 0 y 100
-        if (total.compareTo(BigDecimal.valueOf(100)) > 0) {
-            total = BigDecimal.valueOf(100);
+        public List<CareerRecommendationResponse> getRecommendations() {
+            return recommendations;
         }
-        if (total.compareTo(BigDecimal.ZERO) < 0) {
-            total = BigDecimal.ZERO;
-        }
-
-        return total.setScale(2, BigDecimal.ROUND_HALF_UP);
     }
 }

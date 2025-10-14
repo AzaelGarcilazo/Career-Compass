@@ -7,6 +7,7 @@ import compass.career.CareerCompass.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final SessionRepository sessionRepository;
     private final PasswordRecoveryRepository passwordRecoveryRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -46,10 +48,10 @@ public class AuthServiceImpl implements AuthService {
         Role role = roleRepository.findByName(request.getRole())
                 .orElseThrow(() -> new EntityNotFoundException("Role not found: " + request.getRole()));
 
-        // Crear credenciales (en producción, la contraseña debería estar hasheada)
+        // Crear credenciales con contraseña encriptada
         Credential credential = new Credential();
         credential.setUsername(request.getUsername());
-        credential.setPassword(request.getPassword()); // TODO: Hash password
+        credential.setPassword(passwordEncoder.encode(request.getPassword())); // ← CAMBIO AQUÍ
         credential = credentialRepository.save(credential);
 
         // Crear usuario
@@ -74,8 +76,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new EntityNotFoundException("Invalid credentials"));
 
-        // Verificar contraseña (en producción usar BCrypt)
-        if (!user.getCredential().getPassword().equals(request.getPassword())) {
+        // Verificar contraseña usando BCrypt
+        if (!passwordEncoder.matches(request.getPassword(), user.getCredential().getPassword())) { // ← CAMBIO AQUÍ
             throw new IllegalArgumentException("Invalid credentials");
         }
 
@@ -122,14 +124,14 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        // Verificar contraseña antigua
-        if (!user.getCredential().getPassword().equals(request.getOldPassword())) {
+        // Verificar contraseña antigua usando BCrypt
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getCredential().getPassword())) { // ← CAMBIO AQUÍ
             throw new IllegalArgumentException("Current password is incorrect");
         }
 
-        // Actualizar contraseña (en producción usar hash)
+        // Actualizar contraseña con hash
         Credential credential = user.getCredential();
-        credential.setPassword(request.getNewPassword());
+        credential.setPassword(passwordEncoder.encode(request.getNewPassword())); // ← CAMBIO AQUÍ
         credentialRepository.save(credential);
     }
 

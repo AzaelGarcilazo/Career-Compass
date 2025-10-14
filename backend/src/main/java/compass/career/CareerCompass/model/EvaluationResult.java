@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "evaluation_results")
@@ -22,5 +24,6 @@ public class EvaluationResult {
     private CompletedEvaluation evaluation;
 
     @Column(name = "result_json", nullable = false, columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String resultJson;
 }
