@@ -9,6 +9,7 @@ import compass.career.CareerCompass.repository.AcademicInformationRepository;
 import compass.career.CareerCompass.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AcademicInformationServiceImpl implements AcademicInformationService {
 
     private final AcademicInformationRepository repository;
@@ -25,27 +27,57 @@ public class AcademicInformationServiceImpl implements AcademicInformationServic
     @Override
     @Transactional
     public AcademicInformationResponse create(Integer userId, AcademicInformationRequest request) {
+        log.info("Creating academic information for user {}", userId);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
+        try {
+            request.validateDateLogic();
+        } catch (IllegalArgumentException e) {
+            log.warn("Date validation failed for user {}: {}", userId, e.getMessage());
+            throw e;
+        }
+
+        log.debug("Academic information validated - inProgress: {}, endDate: {}",
+                request.getInProgress(), request.getEndDate());
+
         AcademicInformation entity = AcademicInformationMapper.toEntity(request, user);
         AcademicInformation saved = repository.save(entity);
+
+        log.info("Academic information created successfully with id {} for user {}", saved.getId(), userId);
         return AcademicInformationMapper.toResponse(saved);
     }
 
     @Override
     @Transactional
     public AcademicInformationResponse update(Integer userId, Integer id, AcademicInformationRequest request) {
+        log.info("Updating academic information {} for user {}", id, userId);
+
         AcademicInformation entity = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new EntityNotFoundException("Academic information not found"));
 
+        try {
+            request.validateDateLogic();
+        } catch (IllegalArgumentException e) {
+            log.warn("Date validation failed for user {}: {}", userId, e.getMessage());
+            throw e;
+        }
+
+        log.debug("Academic information validated - inProgress: {}, endDate: {}",
+                request.getInProgress(), request.getEndDate());
+
         AcademicInformationMapper.copyToEntity(request, entity);
         AcademicInformation saved = repository.save(entity);
+
+        log.info("Academic information {} updated successfully for user {}", id, userId);
         return AcademicInformationMapper.toResponse(saved);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AcademicInformationResponse> findByUserId(Integer userId) {
+        log.debug("Finding academic information for user {}", userId);
         return repository.findByUserId(userId).stream()
                 .map(AcademicInformationMapper::toResponse)
                 .collect(Collectors.toList());

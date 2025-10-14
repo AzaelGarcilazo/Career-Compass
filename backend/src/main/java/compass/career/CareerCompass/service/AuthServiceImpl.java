@@ -51,7 +51,7 @@ public class AuthServiceImpl implements AuthService {
         // Crear credenciales con contraseña encriptada
         Credential credential = new Credential();
         credential.setUsername(request.getUsername());
-        credential.setPassword(passwordEncoder.encode(request.getPassword())); // ← CAMBIO AQUÍ
+        credential.setPassword(passwordEncoder.encode(request.getPassword()));
         credential = credentialRepository.save(credential);
 
         // Crear usuario
@@ -77,7 +77,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new EntityNotFoundException("Invalid credentials"));
 
         // Verificar contraseña usando BCrypt
-        if (!passwordEncoder.matches(request.getPassword(), user.getCredential().getPassword())) { // ← CAMBIO AQUÍ
+        if (!passwordEncoder.matches(request.getPassword(), user.getCredential().getPassword())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
@@ -125,13 +125,13 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         // Verificar contraseña antigua usando BCrypt
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getCredential().getPassword())) { // ← CAMBIO AQUÍ
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getCredential().getPassword())) {
             throw new IllegalArgumentException("Current password is incorrect");
         }
 
         // Actualizar contraseña con hash
         Credential credential = user.getCredential();
-        credential.setPassword(passwordEncoder.encode(request.getNewPassword())); // ← CAMBIO AQUÍ
+        credential.setPassword(passwordEncoder.encode(request.getNewPassword()));
         credentialRepository.save(credential);
     }
 

@@ -2,6 +2,7 @@ package compass.career.CareerCompass.controller;
 
 import compass.career.CareerCompass.dto.SkillRequest;
 import compass.career.CareerCompass.dto.SkillResponse;
+import compass.career.CareerCompass.dto.UpdateSkillRequest;
 import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.SkillService;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/skills")
@@ -43,17 +43,14 @@ public class SkillController {
                 .body(response);
     }
 
-    @PatchMapping("/{id}/proficiency")
-    public SkillResponse updateProficiencyLevel(
+    @PutMapping("/{id}")
+    public SkillResponse updateSkill(
             @RequestHeader("Authorization") String token,
             @PathVariable Integer id,
-            @RequestBody Map<String, Integer> body) {
+            @Valid @RequestBody UpdateSkillRequest request) {
         String cleanToken = token.replace("Bearer ", "");
         User user = authService.getUserFromToken(cleanToken);
-        Integer newLevel = body.get("proficiencyLevel");
-        if (newLevel == null) {
-            throw new IllegalArgumentException("proficiencyLevel is required");
-        }
-        return skillService.updateProficiencyLevel(user.getId(), id, newLevel);
+        return skillService.update(user.getId(), id, request);
     }
+
 }

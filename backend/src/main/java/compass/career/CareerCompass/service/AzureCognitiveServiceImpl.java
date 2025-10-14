@@ -227,7 +227,6 @@ public class AzureCognitiveServiceImpl implements AzureCognitiveService {
         Map<String, Double> dimensions = new HashMap<>();
 
         // Análisis basado en palabras clave y sentimientos
-        // Estos cálculos son simplificados; en producción usarías ML más sofisticado
 
         // OPENNESS (Apertura a experiencias) - basado en diversidad de frases clave
         double openness = 50.0 + (keyPhrases.size() * 2.0) + (sentimentScore * 10);
