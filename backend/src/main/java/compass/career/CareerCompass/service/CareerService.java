@@ -12,5 +12,5 @@ public interface CareerService {
     CareerDetailResponse getCareerDetails(Integer careerId);
     FavoriteCareerResponse addFavoriteCareer(Integer userId, FavoriteCareerRequest request);
     void removeFavoriteCareer(Integer userId, Integer careerId);
-    List<FavoriteCareerResponse> getFavoriteCareers(Integer userId);
+    List<FavoriteCareerResponse> getFavoriteCareers(Integer userId, int page, int pageSize);
 }

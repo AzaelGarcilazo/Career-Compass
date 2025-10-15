@@ -10,6 +10,8 @@ import compass.career.CareerCompass.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,9 +78,13 @@ public class AcademicInformationServiceImpl implements AcademicInformationServic
 
     @Override
     @Transactional(readOnly = true)
-    public List<AcademicInformationResponse> findByUserId(Integer userId) {
-        log.debug("Finding academic information for user {}", userId);
-        return repository.findByUserId(userId).stream()
+    public List<AcademicInformationResponse> findByUserId(Integer userId, int page, int pageSize) {
+        log.debug("Finding academic information for user {} with pagination - page: {}, pageSize: {}",
+                userId, page, pageSize);
+
+        Pageable pageable = PageRequest.of(page, pageSize);
+
+        return repository.findByUserId(userId, pageable).stream()
                 .map(AcademicInformationMapper::toResponse)
                 .collect(Collectors.toList());
     }

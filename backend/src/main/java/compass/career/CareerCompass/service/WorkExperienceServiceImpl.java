@@ -10,6 +10,8 @@ import compass.career.CareerCompass.repository.WorkExperienceRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,9 +80,13 @@ public class WorkExperienceServiceImpl implements WorkExperienceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<WorkExperienceResponse> findByUserId(Integer userId) {
-        log.debug("Finding work experiences for user {}", userId);
-        return repository.findByUserId(userId).stream()
+    public List<WorkExperienceResponse> findByUserId(Integer userId, int page, int pageSize) {
+        log.debug("Finding work experiences for user {} with pagination - page: {}, pageSize: {}",
+                userId, page, pageSize);
+
+        Pageable pageable = PageRequest.of(page, pageSize);
+
+        return repository.findByUserId(userId, pageable).stream()
                 .map(WorkExperienceMapper::toResponse)
                 .collect(Collectors.toList());
     }

@@ -12,6 +12,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,9 +92,13 @@ public class SkillServiceImpl implements SkillService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SkillResponse> findByUserId(Integer userId) {
-        log.debug("Finding skills for user {}", userId);
-        return repository.findByUserId(userId).stream()
+    public List<SkillResponse> findByUserId(Integer userId, int page, int pageSize) {
+        log.debug("Finding skills for user {} with pagination - page: {}, pageSize: {}",
+                userId, page, pageSize);
+
+        Pageable pageable = PageRequest.of(page, pageSize);
+
+        return repository.findByUserId(userId, pageable).stream()
                 .map(SkillMapper::toResponse)
                 .collect(Collectors.toList());
     }

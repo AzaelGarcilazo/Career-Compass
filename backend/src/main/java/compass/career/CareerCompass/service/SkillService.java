@@ -9,5 +9,5 @@ import java.util.List;
 public interface SkillService {
     SkillResponse create(Integer userId, SkillRequest request);
     SkillResponse update(Integer userId, Integer id, UpdateSkillRequest request);
-    List<SkillResponse> findByUserId(Integer userId);
+    List<SkillResponse> findByUserId(Integer userId, int page, int pageSize);
 }

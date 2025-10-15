@@ -11,6 +11,8 @@ import compass.career.CareerCompass.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -225,8 +227,13 @@ public class CareerServiceImpl implements CareerService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FavoriteCareerResponse> getFavoriteCareers(Integer userId) {
-        return favoriteCareerRepository.findByUserIdAndActiveTrue(userId).stream()
+    public List<FavoriteCareerResponse> getFavoriteCareers(Integer userId, int page, int pageSize) {
+        log.debug("Finding favorite careers for user {} with pagination - page: {}, pageSize: {}",
+                userId, page, pageSize);
+
+        Pageable pageable = PageRequest.of(page, pageSize);
+
+        return favoriteCareerRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
                 .map(CareerMapper::toFavoriteResponse)
                 .collect(Collectors.toList());
     }

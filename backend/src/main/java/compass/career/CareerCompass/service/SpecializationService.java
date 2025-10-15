@@ -12,5 +12,5 @@ public interface SpecializationService {
     SpecializationDetailResponse getSpecializationDetails(Integer specializationId);
     FavoriteSpecializationResponse addFavoriteSpecialization(Integer userId, FavoriteSpecializationRequest request);
     void removeFavoriteSpecialization(Integer userId, Integer specializationId);
-    List<FavoriteSpecializationResponse> getFavoriteSpecializations(Integer userId);
+    List<FavoriteSpecializationResponse> getFavoriteSpecializations(Integer userId, int page, int pageSize);
 }
