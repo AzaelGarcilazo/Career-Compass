@@ -418,14 +418,16 @@ public class SpecializationServiceImpl implements SpecializationService {
 
         Pageable pageable = PageRequest.of(page, pageSize);
 
-        return favoriteSpecializationRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
+        List<FavoriteSpecializationResponse> favorites = favoriteSpecializationRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
                 .map(SpecializationMapper::toFavoriteResponse)
                 .collect(Collectors.toList());
-    }
 
-    // ============================================
-    // CLASES INTERNAS
-    // ============================================
+        if (favorites.isEmpty()) {
+            throw new IllegalArgumentException("There are no favorite specializations registered for this user.");
+        }
+
+        return favorites;
+    }
 
     private static class CachedSpecializationRecommendations {
         private final List<SpecializationRecommendationResponse> recommendations;

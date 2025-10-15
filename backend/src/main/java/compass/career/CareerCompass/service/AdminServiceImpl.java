@@ -26,9 +26,15 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<TestListResponse> getAllTests() {
-        return testRepository.findAll().stream()
+        List<TestListResponse> tests = testRepository.findAll().stream()
                 .map(AdminMapper::toTestListResponse)
                 .collect(Collectors.toList());
+
+        if (tests.isEmpty()) {
+            throw new IllegalArgumentException("No hay tests disponibles en el sistema");
+        }
+
+        return tests;
     }
 
     @Override
@@ -99,9 +105,15 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<CareerResponse> getAllCareers() {
-        return careerRepository.findAll().stream()
+        List<CareerResponse> careers = careerRepository.findAll().stream()
                 .map(AdminMapper::toCareerResponse)
                 .collect(Collectors.toList());
+
+        if (careers.isEmpty()) {
+            throw new IllegalArgumentException("No hay carreras disponibles en el sistema");
+        }
+
+        return careers;
     }
 
     @Override
@@ -135,9 +147,15 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<SpecializationAreaResponse> getAllSpecializations() {
-        return specializationAreaRepository.findAll().stream()
+        List<SpecializationAreaResponse> specializations = specializationAreaRepository.findAll().stream()
                 .map(AdminMapper::toSpecializationResponse)
                 .collect(Collectors.toList());
+
+        if (specializations.isEmpty()) {
+            throw new IllegalArgumentException("No hay especializaciones disponibles en el sistema");
+        }
+
+        return specializations;
     }
 
     @Override

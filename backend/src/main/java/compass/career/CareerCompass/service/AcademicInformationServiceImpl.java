@@ -84,8 +84,14 @@ public class AcademicInformationServiceImpl implements AcademicInformationServic
 
         Pageable pageable = PageRequest.of(page, pageSize);
 
-        return repository.findByUserId(userId, pageable).stream()
+        List<AcademicInformationResponse> academicInfo = repository.findByUserId(userId, pageable).stream()
                 .map(AcademicInformationMapper::toResponse)
                 .collect(Collectors.toList());
+
+        if (academicInfo.isEmpty()) {
+            throw new IllegalArgumentException("There is no academic information recorded for this user.");
+        }
+
+        return academicInfo;
     }
 }

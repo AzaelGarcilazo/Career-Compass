@@ -233,9 +233,15 @@ public class CareerServiceImpl implements CareerService {
 
         Pageable pageable = PageRequest.of(page, pageSize);
 
-        return favoriteCareerRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
+        List<FavoriteCareerResponse> favorites = favoriteCareerRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
                 .map(CareerMapper::toFavoriteResponse)
                 .collect(Collectors.toList());
+
+        if (favorites.isEmpty()) {
+            throw new IllegalArgumentException("There are no favorite careers registered for this user.");
+        }
+
+        return favorites;
     }
 
     // Clase interna para caché

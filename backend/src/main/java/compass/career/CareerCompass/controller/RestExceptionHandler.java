@@ -9,12 +9,18 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.net.SocketTimeoutException;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,7 +84,6 @@ public class RestExceptionHandler {
         String message = "Data integrity error";
         String code = "DATA_INTEGRITY_ERROR";
 
-        // Detectar violaciones específicas
         String exMessage = ex.getMessage().toLowerCase();
 
         if (exMessage.contains("duplicate") || exMessage.contains("unique")) {
@@ -102,6 +107,181 @@ public class RestExceptionHandler {
 
         Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.CONFLICT);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    /**
+     * Maneja errores de conexión a la base de datos, incluyendo credenciales incorrectas
+     */
+    @ExceptionHandler(SQLException.class)
+    public ResponseEntity<Map<String, Object>> handleSQLException(SQLException ex) {
+        String message = "Error connecting to the database";
+        String code = "DATABASE_CONNECTION_ERROR";
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+
+        String exMessage = ex.getMessage().toLowerCase();
+
+        // Detectar credenciales incorrectas
+        if (exMessage.contains("authentication failed") ||
+                exMessage.contains("password authentication failed") ||
+                exMessage.contains("access denied") ||
+                exMessage.contains("invalid authorization")) {
+            message = "Database authentication failed. Please check database credentials in configuration";
+            code = "DATABASE_AUTH_FAILED";
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        // Detectar que la base de datos no existe
+        else if (exMessage.contains("database") && exMessage.contains("does not exist")) {
+            message = "The specified database does not exist";
+            code = "DATABASE_NOT_FOUND";
+        }
+        // Detectar timeout de conexión
+        else if (exMessage.contains("timeout") || exMessage.contains("timed out")) {
+            message = "Database connection timeout. The server may be unavailable";
+            code = "DATABASE_TIMEOUT";
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, status);
+
+        if (isDevelopmentMode()) {
+            body.put("sqlState", ex.getSQLState());
+            body.put("errorCode", ex.getErrorCode());
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(status).body(body);
+    }
+
+    // ============= EXCEPCIONES DE AUTENTICACIÓN Y AUTORIZACIÓN =============
+
+    /**
+     * Maneja cuando falta el header de Authorization requerido
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingHeader(MissingRequestHeaderException ex) {
+        String message = "Missing required header";
+        String code = "MISSING_HEADER";
+
+        // Detectar específicamente el header de Authorization
+        if ("Authorization".equalsIgnoreCase(ex.getHeaderName())) {
+            message = "Authorization header is required. Please include a valid Bearer token";
+            code = "MISSING_AUTHORIZATION_HEADER";
+        } else {
+            message = String.format("Missing required header: %s", ex.getHeaderName());
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.UNAUTHORIZED);
+        body.put("requiredHeader", ex.getHeaderName());
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    // ============= EXCEPCIONES DE APIS EXTERNAS =============
+
+    /**
+     * Maneja errores de cliente HTTP (4xx) al consumir APIs externas
+     */
+    @ExceptionHandler(HttpClientErrorException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpClientError(HttpClientErrorException ex) {
+        String message = "Error calling external API";
+        String code = "EXTERNAL_API_CLIENT_ERROR";
+        HttpStatus status = HttpStatus.BAD_GATEWAY;
+
+        int statusCode = ex.getStatusCode().value();
+
+        // Detectar errores específicos
+        if (statusCode == 401) {
+            message = "External API authentication failed. Please check API key or credentials";
+            code = "EXTERNAL_API_UNAUTHORIZED";
+        } else if (statusCode == 403) {
+            message = "Access forbidden to external API. Verify API permissions and credentials";
+            code = "EXTERNAL_API_FORBIDDEN";
+        } else if (statusCode == 404) {
+            message = "External API endpoint not found. The URL or endpoint may be incorrect";
+            code = "EXTERNAL_API_NOT_FOUND";
+        } else if (statusCode == 429) {
+            message = "External API rate limit exceeded. Please try again later";
+            code = "EXTERNAL_API_RATE_LIMIT";
+            status = HttpStatus.TOO_MANY_REQUESTS;
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, status);
+        body.put("externalApiStatus", statusCode);
+
+        if (isDevelopmentMode()) {
+            body.put("externalApiResponse", ex.getResponseBodyAsString());
+        }
+
+        return ResponseEntity.status(status).body(body);
+    }
+
+    /**
+     * Maneja errores de servidor HTTP (5xx) al consumir APIs externas
+     */
+    @ExceptionHandler(HttpServerErrorException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpServerError(HttpServerErrorException ex) {
+        String message = "External API server error. The service may be temporarily unavailable";
+        String code = "EXTERNAL_API_SERVER_ERROR";
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.BAD_GATEWAY);
+        body.put("externalApiStatus", ex.getStatusCode().value());
+
+        if (isDevelopmentMode()) {
+            body.put("externalApiResponse", ex.getResponseBodyAsString());
+        }
+
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
+    }
+
+    /**
+     * Maneja timeouts y errores de conexión a APIs externas
+     */
+    @ExceptionHandler(ResourceAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceAccessException(ResourceAccessException ex) {
+        String message = "Cannot connect to external service";
+        String code = "EXTERNAL_SERVICE_UNAVAILABLE";
+
+        // Detectar timeout específicamente
+        if (ex.getCause() instanceof SocketTimeoutException) {
+            message = "External service timeout. The connection took too long to respond. " +
+                    "This may be due to network restrictions or service unavailability";
+            code = "EXTERNAL_SERVICE_TIMEOUT";
+        }
+        // Detectar problemas de red
+        else if (ex.getMessage().contains("Connection refused")) {
+            message = "External service connection refused. The service may be down or unreachable";
+            code = "EXTERNAL_SERVICE_CONNECTION_REFUSED";
+        }
+        else if (ex.getMessage().contains("Connection timed out")) {
+            message = "External service connection timed out. Check network connectivity or firewall settings";
+            code = "EXTERNAL_SERVICE_CONNECTION_TIMEOUT";
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.SERVICE_UNAVAILABLE);
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+            body.put("cause", ex.getCause() != null ? ex.getCause().getClass().getSimpleName() : "Unknown");
+        }
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    /**
+     * Maneja timeouts de socket directamente
+     */
+    @ExceptionHandler(SocketTimeoutException.class)
+    public ResponseEntity<Map<String, Object>> handleSocketTimeout(SocketTimeoutException ex) {
+        String message = "Request timeout. The operation took too long to complete. " +
+                "This may be due to slow network or service overload";
+        String code = "REQUEST_TIMEOUT";
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.GATEWAY_TIMEOUT);
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(body);
     }
 
     // ============= EXCEPCIONES DE HTTP =============
@@ -188,7 +368,6 @@ public class RestExceptionHandler {
         String message = "The JSON format is invalid";
         String code = "INVALID_JSON";
 
-        // Detectar errores específicos
         String exMessage = ex.getMessage();
 
         if (exMessage.contains("LocalDate")) {
@@ -224,7 +403,6 @@ public class RestExceptionHandler {
     }
 
     private boolean isDevelopmentMode() {
-        // Detectar si estamos en modo desarrollo
         String env = System.getProperty("spring.profiles.active");
         return env == null || env.equals("dev") || env.equals("development");
     }

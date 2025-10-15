@@ -387,9 +387,15 @@ public class EvaluationServiceImpl implements EvaluationService {
     @Override
     @Transactional(readOnly = true)
     public List<EvaluationHistoryResponse> getEvaluationHistory(Integer userId) {
-        return completedEvaluationRepository.findByUserIdOrderByCompletionDateDesc(userId).stream()
+        List<EvaluationHistoryResponse> history = completedEvaluationRepository.findByUserIdOrderByCompletionDateDesc(userId).stream()
                 .map(EvaluationMapper::toHistoryResponse)
                 .collect(Collectors.toList());
+
+        if (history.isEmpty()) {
+            throw new IllegalArgumentException("There is no review history for this user.");
+        }
+
+        return history;
     }
 
     // Métodos auxiliares
