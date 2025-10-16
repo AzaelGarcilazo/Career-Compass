@@ -29,7 +29,6 @@ public class SpecializationServiceImpl implements SpecializationService {
     private final SpecializationRecommendationRepository specializationRecommendationRepository;
     private final UserRepository userRepository;
     private final CompletedEvaluationRepository completedEvaluationRepository;
-    private final EvaluationResultRepository evaluationResultRepository;
     private final SkillRepository skillRepository;
     private final SocialMediaApiService socialMediaApiService;
     private final CareerRepository careerRepository;

@@ -23,7 +23,7 @@ public class CareerController {
     private final CareerService careerService;
     private final AuthService authService;
 
-    @GetMapping("/recommendations")
+    @PostMapping("/recommendations")
     public List<CareerRecommendationResponse> getRecommendedCareers(
             @RequestHeader("Authorization") String token) {
         String cleanToken = token.replace("Bearer ", "");

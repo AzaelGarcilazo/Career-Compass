@@ -42,7 +42,6 @@ public class EvaluationServiceImpl implements EvaluationService {
         Test test = testRepository.findByTestTypeNameAndActiveTrue("personality")
                 .orElseThrow(() -> new EntityNotFoundException("Personality test not found"));
 
-        // Obtener preguntas aleatorias
         List<Question> randomQuestions = questionRepository
                 .findRandomActiveQuestionsByTestId(test.getId(), test.getQuestionsToShow());
 
@@ -70,19 +69,16 @@ public class EvaluationServiceImpl implements EvaluationService {
             throw new IllegalArgumentException("Invalid test type");
         }
 
-        // Validar que todas las preguntas fueron respondidas
         if (request.getAnswers().size() != test.getQuestionsToShow()) {
             throw new IllegalArgumentException("All questions must be answered");
         }
 
-        // Crear evaluación completada
         CompletedEvaluation evaluation = new CompletedEvaluation();
         evaluation.setUser(user);
         evaluation.setTest(test);
         evaluation.setCompletionDate(LocalDateTime.now());
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Guardar respuestas del usuario
         Map<String, Object> responses = new HashMap<>();
         for (UserAnswerRequest answerReq : request.getAnswers()) {
             Question question = questionRepository.findById(answerReq.getQuestionId())
@@ -97,19 +93,15 @@ public class EvaluationServiceImpl implements EvaluationService {
             userAnswer.setOption(option);
             userAnswerRepository.save(userAnswer);
 
-            // Preparar datos para Azure
             responses.put("Q" + question.getId(), option.getOptionText());
         }
 
-        // Llamar a Azure Cognitive Services para análisis de personalidad
         Map<String, Object> personalityAnalysis = azureCognitiveService.analyzePersonality(responses);
 
-        // Calcular score total (promedio de dimensiones)
         BigDecimal totalScore = calculateAverageScore(personalityAnalysis);
         evaluation.setTotalScore(totalScore);
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Guardar resultado en JSON
         EvaluationResult result = new EvaluationResult();
         result.setEvaluation(evaluation);
         try {
@@ -117,7 +109,9 @@ public class EvaluationServiceImpl implements EvaluationService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing result", e);
         }
-        evaluationResultRepository.save(result);
+        EvaluationResult savedResult = evaluationResultRepository.save(result);
+
+        evaluation.setEvaluationResult(savedResult);
 
         return EvaluationMapper.toResultResponse(evaluation);
     }
@@ -128,7 +122,6 @@ public class EvaluationServiceImpl implements EvaluationService {
         Test test = testRepository.findByTestTypeNameAndActiveTrue("vocational_interests")
                 .orElseThrow(() -> new EntityNotFoundException("Vocational interests test not found"));
 
-        // Obtener preguntas aleatorias
         List<Question> randomQuestions = questionRepository
                 .findRandomActiveQuestionsByTestId(test.getId(), test.getQuestionsToShow());
 
@@ -156,19 +149,16 @@ public class EvaluationServiceImpl implements EvaluationService {
             throw new IllegalArgumentException("Invalid test type");
         }
 
-        // Validar que todas las preguntas fueron respondidas
         if (request.getAnswers().size() != test.getQuestionsToShow()) {
             throw new IllegalArgumentException("All questions must be answered");
         }
 
-        // Crear evaluación completada
         CompletedEvaluation evaluation = new CompletedEvaluation();
         evaluation.setUser(user);
         evaluation.setTest(test);
         evaluation.setCompletionDate(LocalDateTime.now());
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Guardar respuestas y calcular puntajes por área
         Map<String, Integer> areaScores = new HashMap<>();
 
         for (UserAnswerRequest answerReq : request.getAnswers()) {
@@ -184,7 +174,6 @@ public class EvaluationServiceImpl implements EvaluationService {
             userAnswer.setOption(option);
             userAnswerRepository.save(userAnswer);
 
-            // Acumular puntajes por categoría/área
             if (option.getCategory() != null) {
                 areaScores.put(option.getCategory(),
                         areaScores.getOrDefault(option.getCategory(), 0) +
@@ -192,7 +181,6 @@ public class EvaluationServiceImpl implements EvaluationService {
             }
         }
 
-        // Calcular porcentajes (suma debe ser 100%)
         int totalScore = areaScores.values().stream().mapToInt(Integer::intValue).sum();
         Map<String, BigDecimal> areaPercentages = new HashMap<>();
 
@@ -203,13 +191,11 @@ public class EvaluationServiceImpl implements EvaluationService {
             areaPercentages.put(entry.getKey(), percentage);
         }
 
-        // Ordenar áreas por porcentaje (top 5)
         List<Map.Entry<String, BigDecimal>> sortedAreas = areaPercentages.entrySet().stream()
                 .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
                 .limit(5)
                 .collect(Collectors.toList());
 
-        // Guardar resultados por área
         int ranking = 1;
         for (Map.Entry<String, BigDecimal> entry : sortedAreas) {
             VocationalArea area = vocationalAreaRepository.findByName(entry.getKey())
@@ -227,7 +213,6 @@ public class EvaluationServiceImpl implements EvaluationService {
             areaResultRepository.save(areaResult);
         }
 
-        // Calcular score promedio
         BigDecimal avgScore = sortedAreas.isEmpty() ? BigDecimal.ZERO :
                 sortedAreas.stream()
                         .map(Map.Entry::getValue)
@@ -237,14 +222,12 @@ public class EvaluationServiceImpl implements EvaluationService {
         evaluation.setTotalScore(avgScore);
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Preparar resultado con recomendaciones
         Map<String, Object> resultData = new HashMap<>();
         resultData.put("topAreas", sortedAreas.stream()
                 .map(e -> Map.of("area", e.getKey(), "percentage", e.getValue()))
                 .collect(Collectors.toList()));
         resultData.put("recommendations", generateVocationalRecommendations(sortedAreas));
 
-        // Guardar resultado en JSON
         EvaluationResult result = new EvaluationResult();
         result.setEvaluation(evaluation);
         try {
@@ -252,7 +235,9 @@ public class EvaluationServiceImpl implements EvaluationService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing result", e);
         }
-        evaluationResultRepository.save(result);
+        EvaluationResult savedResult = evaluationResultRepository.save(result);
+
+        evaluation.setEvaluationResult(savedResult);
 
         return EvaluationMapper.toResultResponse(evaluation);
     }
@@ -263,7 +248,6 @@ public class EvaluationServiceImpl implements EvaluationService {
         Test test = testRepository.findByTestTypeNameAndActiveTrue("cognitive_skills")
                 .orElseThrow(() -> new EntityNotFoundException("Cognitive skills test not found"));
 
-        // Obtener preguntas aleatorias
         List<Question> randomQuestions = questionRepository
                 .findRandomActiveQuestionsByTestId(test.getId(), test.getQuestionsToShow());
 
@@ -291,19 +275,16 @@ public class EvaluationServiceImpl implements EvaluationService {
             throw new IllegalArgumentException("Invalid test type");
         }
 
-        // Validar que todas las preguntas fueron respondidas
         if (request.getAnswers().size() != test.getQuestionsToShow()) {
             throw new IllegalArgumentException("All questions must be answered");
         }
 
-        // Crear evaluación completada
         CompletedEvaluation evaluation = new CompletedEvaluation();
         evaluation.setUser(user);
         evaluation.setTest(test);
         evaluation.setCompletionDate(LocalDateTime.now());
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Guardar respuestas y calcular puntajes por área cognitiva
         Map<String, Integer> cognitiveScores = new HashMap<>();
         Map<String, Integer> cognitiveMaxScores = new HashMap<>();
 
@@ -320,13 +301,11 @@ public class EvaluationServiceImpl implements EvaluationService {
             userAnswer.setOption(option);
             userAnswerRepository.save(userAnswer);
 
-            // Acumular puntajes por categoría cognitiva
             if (option.getCategory() != null && option.getWeightValue() != null) {
                 String category = option.getCategory();
                 cognitiveScores.put(category,
                         cognitiveScores.getOrDefault(category, 0) + option.getWeightValue());
 
-                // Encontrar el máximo peso posible para esta pregunta
                 int maxWeight = question.getAnswerOptions().stream()
                         .filter(o -> category.equals(o.getCategory()))
                         .mapToInt(o -> o.getWeightValue() != null ? o.getWeightValue() : 0)
@@ -338,7 +317,6 @@ public class EvaluationServiceImpl implements EvaluationService {
             }
         }
 
-        // Calcular puntuaciones 0-100 por área
         Map<String, Object> areaScores = new HashMap<>();
         for (String category : cognitiveScores.keySet()) {
             int score = cognitiveScores.get(category);
@@ -355,7 +333,6 @@ public class EvaluationServiceImpl implements EvaluationService {
             areaScores.put(category, areaData);
         }
 
-        // Calcular score total promedio
         BigDecimal totalScore = cognitiveScores.isEmpty() ? BigDecimal.ZERO :
                 areaScores.values().stream()
                         .map(v -> ((Map<String, Object>) v).get("score"))
@@ -366,12 +343,10 @@ public class EvaluationServiceImpl implements EvaluationService {
         evaluation.setTotalScore(totalScore);
         evaluation = completedEvaluationRepository.save(evaluation);
 
-        // Preparar resultado
         Map<String, Object> resultData = new HashMap<>();
         resultData.put("cognitiveAreas", areaScores);
         resultData.put("overallLevel", determineLevel(totalScore));
 
-        // Guardar resultado en JSON
         EvaluationResult result = new EvaluationResult();
         result.setEvaluation(evaluation);
         try {
@@ -379,7 +354,9 @@ public class EvaluationServiceImpl implements EvaluationService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error processing result", e);
         }
-        evaluationResultRepository.save(result);
+        EvaluationResult savedResult = evaluationResultRepository.save(result);
+
+        evaluation.setEvaluationResult(savedResult);
 
         return EvaluationMapper.toResultResponse(evaluation);
     }
@@ -387,7 +364,8 @@ public class EvaluationServiceImpl implements EvaluationService {
     @Override
     @Transactional(readOnly = true)
     public List<EvaluationHistoryResponse> getEvaluationHistory(Integer userId) {
-        List<EvaluationHistoryResponse> history = completedEvaluationRepository.findByUserIdOrderByCompletionDateDesc(userId).stream()
+        List<EvaluationHistoryResponse> history = completedEvaluationRepository
+                .findByUserIdOrderByCompletionDateDesc(userId).stream()
                 .map(EvaluationMapper::toHistoryResponse)
                 .collect(Collectors.toList());
 

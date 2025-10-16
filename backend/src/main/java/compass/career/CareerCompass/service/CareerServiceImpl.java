@@ -29,7 +29,6 @@ public class CareerServiceImpl implements CareerService {
     private final CareerRecommendationRepository careerRecommendationRepository;
     private final UserRepository userRepository;
     private final CompletedEvaluationRepository completedEvaluationRepository;
-    private final EvaluationResultRepository evaluationResultRepository;
     private final SocialMediaApiService socialMediaApiService;
     private final GroqService groqService;
     private final ObjectMapper objectMapper;

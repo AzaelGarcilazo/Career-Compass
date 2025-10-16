@@ -23,7 +23,7 @@ public class SpecializationController {
     private final SpecializationService specializationService;
     private final AuthService authService;
 
-    @GetMapping("/recommendations")
+    @PostMapping("/recommendations")
     public List<SpecializationRecommendationResponse> getRecommendedSpecializations(
             @RequestHeader("Authorization") String token) {
         String cleanToken = token.replace("Bearer ", "");
