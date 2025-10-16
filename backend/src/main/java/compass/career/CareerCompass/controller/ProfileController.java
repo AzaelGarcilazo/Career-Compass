@@ -4,6 +4,7 @@ import compass.career.CareerCompass.dto.CompleteProfileResponse;
 import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.ProfileService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,9 @@ public class ProfileController {
     private final AuthService authService;
 
     @GetMapping
+    @Operation(summary = "Obtener el perfil completo del usuario",
+    description = "Recupera toda la información del perfil del usuario autenticado."
+    )
     public CompleteProfileResponse getCompleteProfile(
             @RequestHeader("Authorization") String token) {
         String cleanToken = token.replace("Bearer ", "");
