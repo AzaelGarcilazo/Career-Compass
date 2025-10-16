@@ -6,6 +6,7 @@ import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.FavoriteCareerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,12 +20,17 @@ import java.util.List;
 @RequestMapping("/api/v1/favorite-careers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+@Tag(name = "Favorite Careers", description = "Endpoints para gestión de carreras favoritas del usuario")
 public class FavoriteCareerController {
 
     private final FavoriteCareerService careerService;
     private final AuthService authService;
 
     @PostMapping
+    @Operation(
+            summary = "Agregar una carrera a favoritos",
+            description = "Permite al usuario marcar una carrera como favorita para consultarla fácilmente más adelante. Se puede agregar notas personales sobre por qué la carrera es de interés. El sistema valida que no se agregue una carrera duplicada y permite un máximo de carreras favoritas por usuario."
+    )
     public ResponseEntity<FavoriteCareerResponse> addFavoriteCareer(
             @RequestHeader("Authorization") String token,
             @Valid @RequestBody FavoriteCareerRequest request) {
@@ -38,6 +44,10 @@ public class FavoriteCareerController {
 
     @DeleteMapping("/{careerId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Eliminar una carrera de favoritos",
+            description = "Remueve una carrera de la lista de favoritos del usuario. La carrera se marca como inactiva pero no se elimina físicamente de la base de datos, permitiendo reactivarla posteriormente si se vuelve a agregar."
+    )
     public void removeFavoriteCareer(
             @RequestHeader("Authorization") String token,
             @PathVariable Integer careerId) {
@@ -47,7 +57,10 @@ public class FavoriteCareerController {
     }
 
     @GetMapping(value = "/favorites", params = { "page", "pageSize" })
-    @Operation(summary = "Get favorite careers with pagination")
+    @Operation(
+            summary = "Obtener carreras favoritas con paginación",
+            description = "Recupera la lista de carreras marcadas como favoritas por el usuario, con soporte para paginación. Permite organizar y navegar grandes cantidades de carreras favoritas de manera eficiente. Los parámetros page y pageSize deben ser mayores o iguales a 0, y no pueden ser ambos 0 simultáneamente."
+    )
     public List<FavoriteCareerResponse> getFavoriteCareers(
             @RequestHeader("Authorization") String token,
             @RequestParam(value = "page", defaultValue = "0", required = false) int page,
