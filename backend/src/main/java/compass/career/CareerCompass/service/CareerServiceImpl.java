@@ -1,10 +1,8 @@
 package compass.career.CareerCompass.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import compass.career.CareerCompass.dto.CareerDetailResponse;
-import compass.career.CareerCompass.dto.CareerRecommendationResponse;
-import compass.career.CareerCompass.dto.FavoriteCareerRequest;
-import compass.career.CareerCompass.dto.FavoriteCareerResponse;
+import compass.career.CareerCompass.dto.*;
+import compass.career.CareerCompass.mapper.AdminMapper;
 import compass.career.CareerCompass.mapper.CareerMapper;
 import compass.career.CareerCompass.model.*;
 import compass.career.CareerCompass.repository.*;
@@ -29,7 +27,6 @@ public class CareerServiceImpl implements CareerService {
 
     private final CareerRepository careerRepository;
     private final CareerRecommendationRepository careerRecommendationRepository;
-    private final FavoriteCareerRepository favoriteCareerRepository;
     private final UserRepository userRepository;
     private final CompletedEvaluationRepository completedEvaluationRepository;
     private final EvaluationResultRepository evaluationResultRepository;
@@ -181,69 +178,6 @@ public class CareerServiceImpl implements CareerService {
         return CareerMapper.toDetailResponse(career, socialMediaData);
     }
 
-    @Override
-    @Transactional
-    public FavoriteCareerResponse addFavoriteCareer(Integer userId, FavoriteCareerRequest request) {
-        // Validar máximo 10 favoritas
-        if (favoriteCareerRepository.countByUserIdAndActiveTrue(userId) >= 10) {
-            throw new IllegalArgumentException("Maximum 10 favorite careers allowed");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
-
-        Career career = careerRepository.findById(request.getCareerId())
-                .orElseThrow(() -> new EntityNotFoundException("Career not found"));
-
-        // Verificar si ya existe como favorita
-        Optional<FavoriteCareer> existing = favoriteCareerRepository.findByUserIdAndCareerId(userId, request.getCareerId());
-
-        if (existing.isPresent()) {
-            FavoriteCareer favorite = existing.get();
-            if (favorite.getActive()) {
-                throw new IllegalArgumentException("Career already in favorites");
-            }
-            // Reactivar favorita
-            favorite.setActive(true);
-            favorite.setNotes(request.getNotes());
-            FavoriteCareer saved = favoriteCareerRepository.save(favorite);
-            return CareerMapper.toFavoriteResponse(saved);
-        }
-
-        FavoriteCareer favorite = CareerMapper.toFavoriteEntity(request, user, career);
-        FavoriteCareer saved = favoriteCareerRepository.save(favorite);
-        return CareerMapper.toFavoriteResponse(saved);
-    }
-
-    @Override
-    @Transactional
-    public void removeFavoriteCareer(Integer userId, Integer careerId) {
-        FavoriteCareer favorite = favoriteCareerRepository.findByUserIdAndCareerId(userId, careerId)
-                .orElseThrow(() -> new EntityNotFoundException("Favorite career not found"));
-
-        favorite.setActive(false);
-        favoriteCareerRepository.save(favorite);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<FavoriteCareerResponse> getFavoriteCareers(Integer userId, int page, int pageSize) {
-        log.debug("Finding favorite careers for user {} with pagination - page: {}, pageSize: {}",
-                userId, page, pageSize);
-
-        Pageable pageable = PageRequest.of(page, pageSize);
-
-        List<FavoriteCareerResponse> favorites = favoriteCareerRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
-                .map(CareerMapper::toFavoriteResponse)
-                .collect(Collectors.toList());
-
-        if (favorites.isEmpty()) {
-            throw new IllegalArgumentException("There are no favorite careers registered for this user.");
-        }
-
-        return favorites;
-    }
-
     // Clase interna para caché
     private static class CachedRecommendations {
         private final List<CareerRecommendationResponse> recommendations;
@@ -261,5 +195,48 @@ public class CareerServiceImpl implements CareerService {
         public List<CareerRecommendationResponse> getRecommendations() {
             return recommendations;
         }
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CareerResponse> getAllCareers() {
+        List<CareerResponse> careers = careerRepository.findAll().stream()
+                .map(AdminMapper::toCareerResponse)
+                .collect(Collectors.toList());
+
+        if (careers.isEmpty()) {
+            throw new IllegalArgumentException("No hay carreras disponibles en el sistema");
+        }
+
+        return careers;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CareerResponse getCareerById(Integer careerId) {
+        Career career = careerRepository.findById(careerId)
+                .orElseThrow(() -> new EntityNotFoundException("The requested career has not been found"));
+
+        return AdminMapper.toCareerResponse(career);
+    }
+
+    @Override
+    @Transactional
+    public CareerResponse createCareer(CareerRequest request) {
+        Career career = AdminMapper.toCareerEntity(request);
+        Career saved = careerRepository.save(career);
+        return AdminMapper.toCareerResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public CareerResponse updateCareer(Integer careerId, CareerRequest request) {
+        Career career = careerRepository.findById(careerId)
+                .orElseThrow(() -> new EntityNotFoundException("The career to update has not been found"));
+
+        AdminMapper.copyToCareerEntity(request, career);
+        Career saved = careerRepository.save(career);
+        return AdminMapper.toCareerResponse(saved);
     }
 }

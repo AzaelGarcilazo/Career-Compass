@@ -1,10 +1,8 @@
 package compass.career.CareerCompass.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import compass.career.CareerCompass.dto.FavoriteSpecializationRequest;
-import compass.career.CareerCompass.dto.FavoriteSpecializationResponse;
-import compass.career.CareerCompass.dto.SpecializationDetailResponse;
-import compass.career.CareerCompass.dto.SpecializationRecommendationResponse;
+import compass.career.CareerCompass.dto.*;
+import compass.career.CareerCompass.mapper.AdminMapper;
 import compass.career.CareerCompass.mapper.SpecializationMapper;
 import compass.career.CareerCompass.model.*;
 import compass.career.CareerCompass.repository.*;
@@ -29,12 +27,12 @@ public class SpecializationServiceImpl implements SpecializationService {
 
     private final SpecializationAreaRepository specializationAreaRepository;
     private final SpecializationRecommendationRepository specializationRecommendationRepository;
-    private final FavoriteSpecializationRepository favoriteSpecializationRepository;
     private final UserRepository userRepository;
     private final CompletedEvaluationRepository completedEvaluationRepository;
     private final EvaluationResultRepository evaluationResultRepository;
     private final SkillRepository skillRepository;
     private final SocialMediaApiService socialMediaApiService;
+    private final CareerRepository careerRepository;
     private final GroqService groqService;
     private final ObjectMapper objectMapper;
 
@@ -364,69 +362,54 @@ public class SpecializationServiceImpl implements SpecializationService {
         return SpecializationMapper.toDetailResponse(specialization, socialMediaData);
     }
 
-    @Override
-    @Transactional
-    public FavoriteSpecializationResponse addFavoriteSpecialization(Integer userId, FavoriteSpecializationRequest request) {
-        // Validar máximo 5 favoritas
-        if (favoriteSpecializationRepository.countByUserIdAndActiveTrue(userId) >= 5) {
-            throw new IllegalArgumentException("Maximum 5 favorite specializations allowed");
-        }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
-
-        SpecializationArea specialization = specializationAreaRepository.findById(request.getSpecializationAreaId())
-                .orElseThrow(() -> new EntityNotFoundException("Specialization area not found"));
-
-        // Verificar si ya existe como favorita
-        Optional<FavoriteSpecialization> existing = favoriteSpecializationRepository
-                .findByUserIdAndSpecializationAreaId(userId, request.getSpecializationAreaId());
-
-        if (existing.isPresent()) {
-            FavoriteSpecialization favorite = existing.get();
-            if (favorite.getActive()) {
-                throw new IllegalArgumentException("Specialization already in favorites");
-            }
-            // Reactivar favorita
-            favorite.setActive(true);
-            favorite.setNotes(request.getNotes());
-            FavoriteSpecialization saved = favoriteSpecializationRepository.save(favorite);
-            return SpecializationMapper.toFavoriteResponse(saved);
-        }
-
-        FavoriteSpecialization favorite = SpecializationMapper.toFavoriteEntity(request, user, specialization);
-        FavoriteSpecialization saved = favoriteSpecializationRepository.save(favorite);
-        return SpecializationMapper.toFavoriteResponse(saved);
-    }
 
     @Override
-    @Transactional
-    public void removeFavoriteSpecialization(Integer userId, Integer specializationId) {
-        FavoriteSpecialization favorite = favoriteSpecializationRepository
-                .findByUserIdAndSpecializationAreaId(userId, specializationId)
-                .orElseThrow(() -> new EntityNotFoundException("Favorite specialization not found"));
+    @Transactional(readOnly = true)
+    public List<SpecializationAreaResponse> getAllSpecializations() {
+        List<SpecializationAreaResponse> specializations = specializationAreaRepository.findAll().stream()
+                .map(AdminMapper::toSpecializationResponse)
+                .collect(Collectors.toList());
 
-        favorite.setActive(false);
-        favoriteSpecializationRepository.save(favorite);
+        if (specializations.isEmpty()) {
+            throw new IllegalArgumentException("No hay especializaciones disponibles en el sistema");
+        }
+
+        return specializations;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<FavoriteSpecializationResponse> getFavoriteSpecializations(Integer userId, int page, int pageSize) {
-        log.debug("Finding favorite specializations for user {} with pagination - page: {}, pageSize: {}",
-                userId, page, pageSize);
+    public SpecializationAreaResponse getSpecializationById(Integer specializationId) {
+        SpecializationArea specialization = specializationAreaRepository.findById(specializationId)
+                .orElseThrow(() -> new EntityNotFoundException("The requested specialization area has not been found"));
 
-        Pageable pageable = PageRequest.of(page, pageSize);
+        return AdminMapper.toSpecializationResponse(specialization);
+    }
 
-        List<FavoriteSpecializationResponse> favorites = favoriteSpecializationRepository.findByUserIdAndActiveTrue(userId, pageable).stream()
-                .map(SpecializationMapper::toFavoriteResponse)
-                .collect(Collectors.toList());
+    @Override
+    @Transactional
+    public SpecializationAreaResponse createSpecialization(SpecializationAreaRequest request) {
+        Career career = careerRepository.findById(request.getCareerId())
+                .orElseThrow(() -> new EntityNotFoundException("The entered career has not been found"));
 
-        if (favorites.isEmpty()) {
-            throw new IllegalArgumentException("There are no favorite specializations registered for this user.");
-        }
+        SpecializationArea specialization = AdminMapper.toSpecializationEntity(request, career);
+        SpecializationArea saved = specializationAreaRepository.save(specialization);
+        return AdminMapper.toSpecializationResponse(saved);
+    }
 
-        return favorites;
+    @Override
+    @Transactional
+    public SpecializationAreaResponse updateSpecialization(Integer specializationId, SpecializationAreaRequest request) {
+        SpecializationArea specialization = specializationAreaRepository.findById(specializationId)
+                .orElseThrow(() -> new EntityNotFoundException("The specialization area to update has not been found"));
+
+        Career career = careerRepository.findById(request.getCareerId())
+                .orElseThrow(() -> new EntityNotFoundException("The entered career has not been found"));
+
+        AdminMapper.copyToSpecializationEntity(request, specialization, career);
+        SpecializationArea saved = specializationAreaRepository.save(specialization);
+        return AdminMapper.toSpecializationResponse(saved);
     }
 
     private static class CachedSpecializationRecommendations {

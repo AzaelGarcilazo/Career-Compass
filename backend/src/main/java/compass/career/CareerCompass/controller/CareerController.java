@@ -1,9 +1,6 @@
 package compass.career.CareerCompass.controller;
 
-import compass.career.CareerCompass.dto.CareerDetailResponse;
-import compass.career.CareerCompass.dto.CareerRecommendationResponse;
-import compass.career.CareerCompass.dto.FavoriteCareerRequest;
-import compass.career.CareerCompass.dto.FavoriteCareerResponse;
+import compass.career.CareerCompass.dto.*;
 import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.CareerService;
@@ -34,47 +31,33 @@ public class CareerController {
         return careerService.getRecommendedCareers(user.getId());
     }
 
-    @GetMapping("/{careerId}")
+    @GetMapping("/details/{careerId}")
     public CareerDetailResponse getCareerDetails(@PathVariable Integer careerId) {
         return careerService.getCareerDetails(careerId);
     }
 
-    @PostMapping("/favorites")
-    public ResponseEntity<FavoriteCareerResponse> addFavoriteCareer(
-            @RequestHeader("Authorization") String token,
-            @Valid @RequestBody FavoriteCareerRequest request) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
-        FavoriteCareerResponse response = careerService.addFavoriteCareer(user.getId(), request);
+    @GetMapping
+    public List<CareerResponse> getAllCareers() {
+        return careerService.getAllCareers();
+    }
+
+    @GetMapping("/{careerId}")
+    public CareerResponse getCareerById(@PathVariable Integer careerId) {
+        return careerService.getCareerById(careerId);
+    }
+
+    @PostMapping
+    public ResponseEntity<CareerResponse> createCareer(@Valid @RequestBody CareerRequest request) {
+        CareerResponse response = careerService.createCareer(request);
         return ResponseEntity
-                .created(URI.create("/api/v1/careers/favorites"))
+                .created(URI.create("/api/v1/admin/careers/" + response.getId()))
                 .body(response);
     }
 
-    @DeleteMapping("/favorites/{careerId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeFavoriteCareer(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Integer careerId) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
-        careerService.removeFavoriteCareer(user.getId(), careerId);
-    }
-
-    @GetMapping(value = "/favorites/pagination", params = { "page", "pageSize" })
-    @Operation(summary = "Get favorite careers with pagination")
-    public List<FavoriteCareerResponse> getFavoriteCareers(
-            @RequestHeader("Authorization") String token,
-            @RequestParam(value = "page", defaultValue = "0", required = false) int page,
-            @RequestParam(value = "pageSize", defaultValue = "10", required = false) int pageSize) {
-
-        if (page < 0 || pageSize < 0 || (page == 0 && pageSize == 0)) {
-            throw new IllegalArgumentException(
-                    "Invalid pagination parameters: page and pageSize cannot be negative and cannot both be 0.");
-        }
-
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
-        return careerService.getFavoriteCareers(user.getId(), page, pageSize);
+    @PutMapping("/{careerId}")
+    public CareerResponse updateCareer(
+            @PathVariable Integer careerId,
+            @Valid @RequestBody CareerRequest request) {
+        return careerService.updateCareer(careerId, request);
     }
 }
