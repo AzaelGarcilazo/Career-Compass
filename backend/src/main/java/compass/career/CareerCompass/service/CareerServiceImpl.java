@@ -9,8 +9,10 @@ import compass.career.CareerCompass.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -196,17 +198,37 @@ public class CareerServiceImpl implements CareerService {
         }
     }
 
-
     @Override
     @Transactional(readOnly = true)
-    public List<CareerResponse> getAllCareers() {
-        List<CareerResponse> careers = careerRepository.findAll().stream()
+    public List<CareerResponse> getAllCareers(int page, int pageSize) {
+        log.info("Fetching careers with pagination: page={}, pageSize={}", page, pageSize);
+
+        // Validar parámetros de paginación
+        if (page < 0 || pageSize <= 0) {
+            throw new IllegalArgumentException("Page must be >= 0 and pageSize must be > 0");
+        }
+
+        // Crear objeto Pageable con ordenamiento por nombre
+        Pageable pageable = PageRequest.of(page, pageSize, Sort.by("name").ascending());
+
+        // Obtener página de carreras
+        Page<Career> careerPage = careerRepository.findAll(pageable);
+
+        // Verificar si hay carreras
+        if (careerPage.isEmpty() && page == 0) {
+            throw new IllegalArgumentException("No hay carreras disponibles en el sistema");
+        }
+
+        // Convertir a DTO
+        List<CareerResponse> careers = careerPage.getContent().stream()
                 .map(AdminMapper::toCareerResponse)
                 .collect(Collectors.toList());
 
-        if (careers.isEmpty()) {
-            throw new IllegalArgumentException("No hay carreras disponibles en el sistema");
-        }
+        log.info("Returned {} careers out of {} total (page {} of {})",
+                careers.size(),
+                careerPage.getTotalElements(),
+                page + 1,
+                careerPage.getTotalPages());
 
         return careers;
     }

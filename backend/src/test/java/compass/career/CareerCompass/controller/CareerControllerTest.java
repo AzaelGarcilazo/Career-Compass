@@ -138,7 +138,7 @@ class CareerControllerTest {
     }
 
     @Test
-    @DisplayName("POST /recommendations → 200 con lista vacía cuando no hay carreras disponibles")
+    @DisplayName("POST /recommendations → 400 cuando no hay carreras disponibles")
     void getRecommendedCareers_noCareersAvailable() throws Exception {
         // Propósito: Verificar el manejo cuando no existen carreras en el sistema
 
@@ -206,19 +206,20 @@ class CareerControllerTest {
         verify(careerService, times(1)).getCareerDetails(999);
     }
 
-    // =============== GET / (getAllCareers) ===============
+    // =============== GET / (getAllCareers con paginación) ===============
 
     @Test
-    @DisplayName("GET / → 200 con lista de todas las carreras disponibles")
-    void getAllCareers_success() throws Exception {
-        // Propósito: Verificar que se pueden listar todas las carreras del sistema
+    @DisplayName("GET / → 200 con carreras paginadas usando valores por defecto")
+    void getAllCareers_withDefaultPagination() throws Exception {
+        // Propósito: Verificar que se usan valores por defecto (page=0, pageSize=10)
+        // cuando no se especifican parámetros de paginación
 
         List<CareerResponse> careers = Arrays.asList(
                 CareerResponse.builder()
                         .id(1)
-                        .name("Medicina")
-                        .description("Ciencias de la salud")
-                        .durationSemesters(12)
+                        .name("Arquitectura")
+                        .description("Diseño y construcción")
+                        .durationSemesters(10)
                         .build(),
                 CareerResponse.builder()
                         .id(2)
@@ -234,25 +235,144 @@ class CareerControllerTest {
                         .build()
         );
 
-        when(careerService.getAllCareers()).thenReturn(careers);
+        when(careerService.getAllCareers(0, 10)).thenReturn(careers);
 
         mvc.perform(get(BASE)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
-                .andExpect(jsonPath("$[0].name").value("Medicina"))
+                .andExpect(jsonPath("$[0].name").value("Arquitectura"))
                 .andExpect(jsonPath("$[1].name").value("Derecho"))
                 .andExpect(jsonPath("$[2].name").value("Ingeniería Civil"));
 
-        verify(careerService, times(1)).getAllCareers();
+        verify(careerService, times(1)).getAllCareers(0, 10);
     }
 
     @Test
-    @DisplayName("GET / → 400 cuando no hay carreras en el sistema")
-    void getAllCareers_empty() throws Exception {
+    @DisplayName("GET / → 200 con carreras paginadas (página 0, tamaño 5)")
+    void getAllCareers_withCustomPagination() throws Exception {
+        // Propósito: Verificar que la paginación funciona correctamente con parámetros personalizados
+
+        List<CareerResponse> careers = Arrays.asList(
+                CareerResponse.builder().id(1).name("Arquitectura").build(),
+                CareerResponse.builder().id(2).name("Ciencias de la Computación").build(),
+                CareerResponse.builder().id(3).name("Derecho").build(),
+                CareerResponse.builder().id(4).name("Ingeniería Civil").build(),
+                CareerResponse.builder().id(5).name("Medicina").build()
+        );
+
+        when(careerService.getAllCareers(0, 5)).thenReturn(careers);
+
+        mvc.perform(get(BASE)
+                        .param("page", "0")
+                        .param("pageSize", "5")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[0].name").value("Arquitectura"))
+                .andExpect(jsonPath("$[4].name").value("Medicina"));
+
+        verify(careerService, times(1)).getAllCareers(0, 5);
+    }
+
+    @Test
+    @DisplayName("GET / → 200 con segunda página de carreras")
+    void getAllCareers_secondPage() throws Exception {
+        // Propósito: Verificar que se puede navegar a páginas posteriores
+
+        List<CareerResponse> careers = Arrays.asList(
+                CareerResponse.builder().id(6).name("Psicología").build(),
+                CareerResponse.builder().id(7).name("Veterinaria").build()
+        );
+
+        when(careerService.getAllCareers(1, 5)).thenReturn(careers);
+
+        mvc.perform(get(BASE)
+                        .param("page", "1")
+                        .param("pageSize", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].name").value("Psicología"))
+                .andExpect(jsonPath("$[1].name").value("Veterinaria"));
+
+        verify(careerService, times(1)).getAllCareers(1, 5);
+    }
+
+    @Test
+    @DisplayName("GET / → 200 con página vacía cuando se solicita página fuera de rango")
+    void getAllCareers_emptyPage() throws Exception {
+        // Propósito: Verificar comportamiento cuando se solicita una página sin datos
+
+        when(careerService.getAllCareers(10, 10)).thenReturn(Collections.emptyList());
+
+        mvc.perform(get(BASE)
+                        .param("page", "10")
+                        .param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        verify(careerService, times(1)).getAllCareers(10, 10);
+    }
+
+    @Test
+    @DisplayName("GET / → 400 cuando page es negativo")
+    void getAllCareers_invalidPageNegative() throws Exception {
+        // Propósito: Verificar validación cuando el número de página es negativo
+
+        when(careerService.getAllCareers(-1, 10))
+                .thenThrow(new IllegalArgumentException("Page must be >= 0 and pageSize must be > 0"));
+
+        mvc.perform(get(BASE)
+                        .param("page", "-1")
+                        .param("pageSize", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.message").value("Page must be >= 0 and pageSize must be > 0"));
+
+        verify(careerService, times(1)).getAllCareers(-1, 10);
+    }
+
+    @Test
+    @DisplayName("GET / → 400 cuando pageSize es cero")
+    void getAllCareers_invalidPageSizeZero() throws Exception {
+        // Propósito: Verificar validación cuando el tamaño de página es cero
+
+        when(careerService.getAllCareers(0, 0))
+                .thenThrow(new IllegalArgumentException("Page must be >= 0 and pageSize must be > 0"));
+
+        mvc.perform(get(BASE)
+                        .param("page", "0")
+                        .param("pageSize", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.message").value("Page must be >= 0 and pageSize must be > 0"));
+
+        verify(careerService, times(1)).getAllCareers(0, 0);
+    }
+
+    @Test
+    @DisplayName("GET / → 400 cuando pageSize es negativo")
+    void getAllCareers_invalidPageSizeNegative() throws Exception {
+        // Propósito: Verificar validación cuando el tamaño de página es negativo
+
+        when(careerService.getAllCareers(0, -5))
+                .thenThrow(new IllegalArgumentException("Page must be >= 0 and pageSize must be > 0"));
+
+        mvc.perform(get(BASE)
+                        .param("page", "0")
+                        .param("pageSize", "-5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+
+        verify(careerService, times(1)).getAllCareers(0, -5);
+    }
+
+    @Test
+    @DisplayName("GET / → 400 cuando no hay carreras en el sistema (primera página)")
+    void getAllCareers_noCareersInSystem() throws Exception {
         // Propósito: Verificar manejo cuando el sistema no tiene carreras registradas
 
-        when(careerService.getAllCareers())
+        when(careerService.getAllCareers(0, 10))
                 .thenThrow(new IllegalArgumentException("No hay carreras disponibles en el sistema"));
 
         mvc.perform(get(BASE))
@@ -260,7 +380,7 @@ class CareerControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
                 .andExpect(jsonPath("$.message").value("No hay carreras disponibles en el sistema"));
 
-        verify(careerService, times(1)).getAllCareers();
+        verify(careerService, times(1)).getAllCareers(0, 10);
     }
 
     // =============== GET /{careerId} ===============

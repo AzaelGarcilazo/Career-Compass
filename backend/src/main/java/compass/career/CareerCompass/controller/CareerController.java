@@ -5,6 +5,7 @@ import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.CareerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ import java.util.List;
 @RequestMapping("/api/v1/careers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
-@Tag(name = "Careers", description = "Endpoints para gestión de carreras universitarias")
+@Tag(name = "Careers", description = "Endpoints for university career management")
 public class CareerController {
 
     private final CareerService careerService;
@@ -26,8 +27,8 @@ public class CareerController {
 
     @PostMapping("/recommendations")
     @Operation(
-            summary = "Obtener recomendaciones de carreras personalizadas",
-            description = "Genera o recupera recomendaciones de carreras basadas en los resultados de las evaluaciones del usuario (personalidad, intereses vocacionales y habilidades cognitivas). Utiliza IA de Groq para generar recomendaciones personalizadas la primera vez. Las recomendaciones se almacenan en caché por 1 hora y en base de datos de forma permanente."
+            summary = "Get personalized career recommendations",
+            description = "Generates or retrieves career recommendations based on the user's evaluation results (personality, vocational interests, and cognitive skills). Uses Groq AI to generate personalized recommendations for the first time. Recommendations are stored in cache for 1 hour and in the database permanently."
     )
     public List<CareerRecommendationResponse> getRecommendedCareers(
             @RequestHeader("Authorization") String token) {
@@ -38,8 +39,8 @@ public class CareerController {
 
     @GetMapping("/details/{careerId}")
     @Operation(
-            summary = "Obtener detalles completos de una carrera",
-            description = "Recupera información detallada de una carrera específica, incluyendo descripción, duración, salario promedio, habilidades requeridas, oportunidades laborales y datos de redes sociales (Reddit) sobre la carrera."
+            summary = "Get complete career details",
+            description = "Retrieves detailed information about a specific career, including description, duration, average salary, required skills, job opportunities, and social media data (Reddit) about the career."
     )
     public CareerDetailResponse getCareerDetails(@PathVariable Integer careerId) {
         return careerService.getCareerDetails(careerId);
@@ -47,17 +48,23 @@ public class CareerController {
 
     @GetMapping
     @Operation(
-            summary = "Listar todas las carreras disponibles",
-            description = "Obtiene el catálogo completo de carreras universitarias disponibles en el sistema, con información básica de cada una."
+            summary = "List all available careers with pagination",
+            description = "Retrieves the catalog of university careers available in the system with pagination support. Careers are sorted alphabetically by name. The page and pageSize parameters control the amount of results returned."
     )
-    public List<CareerResponse> getAllCareers() {
-        return careerService.getAllCareers();
+    public List<CareerResponse> getAllCareers(
+            @Parameter(description = "Page number (starts at 0)", example = "0")
+            @RequestParam(value = "page", defaultValue = "0") int page,
+
+            @Parameter(description = "Number of careers per page", example = "10")
+            @RequestParam(value = "pageSize", defaultValue = "10") int pageSize) {
+
+        return careerService.getAllCareers(page, pageSize);
     }
 
     @GetMapping("/{careerId}")
     @Operation(
-            summary = "Obtener información básica de una carrera por ID",
-            description = "Recupera los datos básicos de una carrera específica utilizando su identificador único."
+            summary = "Get basic career information by ID",
+            description = "Retrieves the basic data of a specific career using its unique identifier."
     )
     public CareerResponse getCareerById(@PathVariable Integer careerId) {
         return careerService.getCareerById(careerId);
@@ -65,8 +72,8 @@ public class CareerController {
 
     @PostMapping
     @Operation(
-            summary = "Crear una nueva carrera (Admin)",
-            description = "Registra una nueva carrera en el sistema con toda su información académica y laboral. Endpoint de administración."
+            summary = "Create a new career (Admin)",
+            description = "Registers a new career in the system with all its academic and professional information. Admin endpoint."
     )
     public ResponseEntity<CareerResponse> createCareer(@Valid @RequestBody CareerRequest request) {
         CareerResponse response = careerService.createCareer(request);
@@ -77,8 +84,8 @@ public class CareerController {
 
     @PutMapping("/{careerId}")
     @Operation(
-            summary = "Actualizar una carrera existente (Admin)",
-            description = "Modifica la información de una carrera registrada en el sistema. Endpoint de administración."
+            summary = "Update an existing career (Admin)",
+            description = "Modifies the information of a career registered in the system. Admin endpoint."
     )
     public CareerResponse updateCareer(
             @PathVariable Integer careerId,

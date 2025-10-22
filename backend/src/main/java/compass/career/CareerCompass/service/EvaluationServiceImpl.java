@@ -376,6 +376,58 @@ public class EvaluationServiceImpl implements EvaluationService {
         return history;
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvaluationDetailResponse getEvaluationDetail(Integer userId, Integer evaluationId) {
+        // Verificar que la evaluación existe y pertenece al usuario
+        CompletedEvaluation evaluation = completedEvaluationRepository.findById(evaluationId)
+                .orElseThrow(() -> new EntityNotFoundException("Evaluation not found"));
+
+        if (!evaluation.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("This evaluation does not belong to the user");
+        }
+
+        // Obtener todas las respuestas del usuario para esta evaluación
+        List<UserAnswer> userAnswers = userAnswerRepository.findByEvaluationIdOrderByQuestionId(evaluationId);
+
+        // Mapear las respuestas al DTO
+        List<UserAnswerDetail> answerDetails = userAnswers.stream()
+                .map(ua -> UserAnswerDetail.builder()
+                        .questionId(ua.getQuestion().getId())
+                        .questionText(ua.getQuestion().getQuestionText())
+                        .selectedOptionId(ua.getOption().getId())
+                        .selectedOptionText(ua.getOption().getOptionText())
+                        .category(ua.getOption().getCategory())
+                        .weightValue(ua.getOption().getWeightValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Parsear el resultado del análisis
+        Object analysisResult = null;
+        if (evaluation.getEvaluationResult() != null &&
+                evaluation.getEvaluationResult().getResultJson() != null) {
+            try {
+                analysisResult = objectMapper.readValue(
+                        evaluation.getEvaluationResult().getResultJson(),
+                        Object.class);
+            } catch (JsonProcessingException e) {
+                // Si hay error al parsear, simplemente dejamos null
+            }
+        }
+
+        return EvaluationDetailResponse.builder()
+                .evaluationId(evaluation.getId())
+                .testName(evaluation.getTest().getName())
+                .testType(evaluation.getTest().getTestType().getName())
+                .completionDate(evaluation.getCompletionDate())
+                .totalScore(evaluation.getTotalScore() != null ?
+                        evaluation.getTotalScore().toString() : "N/A")
+                .answers(answerDetails)
+                .analysisResult(analysisResult)
+                .build();
+    }
+
     // Métodos auxiliares
 
     private BigDecimal calculateAverageScore(Map<String, Object> personalityAnalysis) {

@@ -1,9 +1,6 @@
 package compass.career.CareerCompass.service;
 
-import compass.career.CareerCompass.dto.EvaluationHistoryResponse;
-import compass.career.CareerCompass.dto.EvaluationResultResponse;
-import compass.career.CareerCompass.dto.SubmitTestRequest;
-import compass.career.CareerCompass.dto.TestResponse;
+import compass.career.CareerCompass.dto.*;
 
 import java.util.List;
 
@@ -15,4 +12,6 @@ public interface EvaluationService {
     TestResponse getCognitiveSkillsTest();
     EvaluationResultResponse submitCognitiveSkillsTest(Integer userId, SubmitTestRequest request);
     List<EvaluationHistoryResponse> getEvaluationHistory(Integer userId);
+
+    EvaluationDetailResponse getEvaluationDetail(Integer userId, Integer evaluationId);
 }

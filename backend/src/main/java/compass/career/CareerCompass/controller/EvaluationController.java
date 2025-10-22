@@ -1,9 +1,6 @@
 package compass.career.CareerCompass.controller;
 
-import compass.career.CareerCompass.dto.EvaluationHistoryResponse;
-import compass.career.CareerCompass.dto.EvaluationResultResponse;
-import compass.career.CareerCompass.dto.SubmitTestRequest;
-import compass.career.CareerCompass.dto.TestResponse;
+import compass.career.CareerCompass.dto.*;
 import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
 import compass.career.CareerCompass.service.EvaluationService;
@@ -21,7 +18,7 @@ import java.util.List;
 @RequestMapping("/api/v1/evaluations")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
-@Tag(name = "Evaluations", description = "Endpoints para evaluaciones vocacionales y tests psicométricos")
+@Tag(name = "Evaluations", description = "Endpoints for vocational assessments and psychometric tests")
 public class EvaluationController {
 
     private final EvaluationService evaluationService;
@@ -29,8 +26,8 @@ public class EvaluationController {
 
     @GetMapping("/personality-test")
     @Operation(
-            summary = "Obtener test de personalidad",
-            description = "Recupera las preguntas del test de personalidad basado en el modelo Holland RIASEC. Las preguntas se seleccionan aleatoriamente del banco de preguntas activas del test para garantizar variedad en cada aplicación."
+            summary = "Get personality test",
+            description = "Retrieves the questions for the personality test based on the Holland RIASEC model. Questions are randomly selected from the active question bank to ensure variety in each application."
     )
     public TestResponse getPersonalityTest() {
         return evaluationService.getPersonalityTest();
@@ -38,8 +35,8 @@ public class EvaluationController {
 
     @PostMapping("/personality-test")
     @Operation(
-            summary = "Enviar respuestas del test de personalidad",
-            description = "Procesa las respuestas del usuario al test de personalidad y genera un análisis utilizando Azure Cognitive Services. Calcula las 5 dimensiones de personalidad (conscientiousness, openness, neuroticism, extraversion, agreeableness), realiza análisis de sentimientos y extrae frases clave. Los resultados se almacenan en formato JSON para su posterior uso en la generación de recomendaciones."
+            summary = "Submit personality test answers",
+            description = "Processes the user's responses to the personality test and generates an analysis using Azure Cognitive Services. Calculates the 5 personality dimensions (conscientiousness, openness, neuroticism, extraversion, agreeableness), performs sentiment analysis, and extracts key phrases. Results are stored in JSON format for later use in generating recommendations."
     )
     public ResponseEntity<EvaluationResultResponse> submitPersonalityTest(
             @RequestHeader("Authorization") String token,
@@ -54,8 +51,8 @@ public class EvaluationController {
 
     @GetMapping("/vocational-interests-test")
     @Operation(
-            summary = "Obtener test de intereses vocacionales",
-            description = "Recupera las preguntas del test de intereses vocacionales. Este test evalúa las áreas de interés profesional del usuario y sus afinidades con diferentes campos laborales. Las preguntas se seleccionan aleatoriamente para cada aplicación."
+            summary = "Get vocational interests test",
+            description = "Retrieves the questions for the vocational interests test. This test evaluates the user's areas of professional interest and their affinities with different work fields. Questions are randomly selected for each application."
     )
     public TestResponse getVocationalInterestsTest() {
         return evaluationService.getVocationalInterestsTest();
@@ -63,8 +60,8 @@ public class EvaluationController {
 
     @PostMapping("/vocational-interests-test")
     @Operation(
-            summary = "Enviar respuestas del test de intereses vocacionales",
-            description = "Procesa las respuestas del test de intereses vocacionales y calcula los porcentajes de afinidad con diferentes áreas profesionales. Identifica las top 5 áreas vocacionales del usuario y las almacena en la tabla area_results con su ranking correspondiente. Estos resultados son fundamentales para generar recomendaciones de carreras personalizadas."
+            summary = "Submit vocational interests test answers",
+            description = "Processes the vocational interests test responses and calculates affinity percentages with different professional areas. Identifies the user's top 5 vocational areas and stores them in the area_results table with their corresponding ranking. These results are fundamental for generating personalized career recommendations."
     )
     public ResponseEntity<EvaluationResultResponse> submitVocationalInterestsTest(
             @RequestHeader("Authorization") String token,
@@ -79,8 +76,8 @@ public class EvaluationController {
 
     @GetMapping("/cognitive-skills-test")
     @Operation(
-            summary = "Obtener test de habilidades cognitivas",
-            description = "Recupera las preguntas del test de habilidades cognitivas. Este test evalúa capacidades mentales como razonamiento lógico, memoria, atención, comprensión verbal y habilidades numéricas. Las preguntas son seleccionadas aleatoriamente del banco activo."
+            summary = "Get cognitive skills test",
+            description = "Retrieves the questions for the cognitive skills test. This test evaluates mental abilities such as logical reasoning, memory, attention, verbal comprehension, and numerical skills. Questions are randomly selected from the active bank."
     )
     public TestResponse getCognitiveSkillsTest() {
         return evaluationService.getCognitiveSkillsTest();
@@ -88,8 +85,8 @@ public class EvaluationController {
 
     @PostMapping("/cognitive-skills-test")
     @Operation(
-            summary = "Enviar respuestas del test de habilidades cognitivas",
-            description = "Procesa las respuestas del test de habilidades cognitivas y calcula puntuaciones de 0-100 para cada área evaluada (razonamiento lógico, memoria, etc.). Determina el nivel de dominio (bajo, medio, alto) de cada habilidad y genera un score total promedio. Los resultados ayudan a identificar fortalezas y áreas de mejora del usuario."
+            summary = "Submit cognitive skills test answers",
+            description = "Processes the cognitive skills test responses and calculates scores from 0-100 for each evaluated area (logical reasoning, memory, etc.). Determines the proficiency level (low, medium, high) for each skill and generates an overall average score. Results help identify the user's strengths and areas for improvement."
     )
     public ResponseEntity<EvaluationResultResponse> submitCognitiveSkillsTest(
             @RequestHeader("Authorization") String token,
@@ -104,13 +101,27 @@ public class EvaluationController {
 
     @GetMapping("/history")
     @Operation(
-            summary = "Obtener historial de evaluaciones",
-            description = "Recupera el historial completo de evaluaciones realizadas por el usuario, ordenadas de más reciente a más antigua. Incluye información de todos los tipos de tests completados (personalidad, intereses vocacionales y habilidades cognitivas) con sus fechas de realización y puntuaciones obtenidas."
+            summary = "Get evaluation history",
+            description = "Retrieves the complete history of evaluations completed by the user, ordered from most recent to oldest. Includes information for all types of completed tests (personality, vocational interests, and cognitive skills) with their completion dates and obtained scores."
     )
     public List<EvaluationHistoryResponse> getEvaluationHistory(
             @RequestHeader("Authorization") String token) {
         String cleanToken = token.replace("Bearer ", "");
         User user = authService.getUserFromToken(cleanToken);
         return evaluationService.getEvaluationHistory(user.getId());
+    }
+
+    @GetMapping("/details/{evaluationId}")
+    @Operation(
+            summary = "Get evaluation detail",
+            description = "Retrieves the complete details of a specific evaluation, including all questions answered by the user, the selected options, and the analysis results. This allows users to review their past test responses and see how they answered each question."
+    )
+    public ResponseEntity<EvaluationDetailResponse> getEvaluationDetail(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer evaluationId) {
+        String cleanToken = token.replace("Bearer ", "");
+        User user = authService.getUserFromToken(cleanToken);
+        EvaluationDetailResponse response = evaluationService.getEvaluationDetail(user.getId(), evaluationId);
+        return ResponseEntity.ok(response);
     }
 }
