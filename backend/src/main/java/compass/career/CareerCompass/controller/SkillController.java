@@ -25,8 +25,8 @@ public class SkillController {
     private final AuthService authService;
 
     @GetMapping(value = "pagination", params = { "page", "pageSize" })
-    @Operation(summary = "Obtener habilidades con paginación",
-    description = "Recupera una lista paginada de las habilidades asociadas al perfil del usuario."
+    @Operation(summary = "Gain skills with pagination",
+    description = "Retrieves a paginated list of skills associated with the user's profile."
     )
     public List<SkillResponse> getSkills(
             @RequestHeader("Authorization") String token,
@@ -44,8 +44,8 @@ public class SkillController {
     }
 
     @PostMapping
-    @Operation(summary = "Insertar una nueva habilidad",
-    description = "Permite a un usuario autenticado añadir una nueva habilidad a su perfil."
+    @Operation(summary = "Insert a new skill",
+    description = "Allows an authenticated user to add a new skill to their profile."
     )
     public ResponseEntity<SkillResponse> createSkill(
             @RequestHeader("Authorization") String token,
@@ -60,8 +60,8 @@ public class SkillController {
 
     @PutMapping("/{id}")
     @Operation(
-        summary = "Actualizar una habilidad por su id",
-        description = "Modifica una habilidad existente del usuario, identificada por su id."
+        summary = "Update a skill by its ID",
+        description = "Modify an existing user skill, identified by its id."
     )
     public SkillResponse updateSkill(
             @RequestHeader("Authorization") String token,

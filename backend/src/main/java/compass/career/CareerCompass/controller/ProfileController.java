@@ -18,8 +18,8 @@ public class ProfileController {
     private final AuthService authService;
 
     @GetMapping
-    @Operation(summary = "Obtener el perfil completo del usuario",
-    description = "Recupera toda la información del perfil del usuario autenticado."
+    @Operation(summary = "Get the full user profile",
+    description = "Retrieves all profile information of the authenticated user."
     )
     public CompleteProfileResponse getCompleteProfile(
             @RequestHeader("Authorization") String token) {
