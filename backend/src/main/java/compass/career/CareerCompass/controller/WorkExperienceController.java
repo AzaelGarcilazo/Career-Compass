@@ -24,7 +24,9 @@ public class WorkExperienceController {
     private final AuthService authService;
 
     @GetMapping(value = "pagination", params = { "page", "pageSize" })
-    @Operation(summary = "Get work experiences with pagination")
+    @Operation(summary = "Gain work experience with pagination",
+    description = "Retrieves the authenticated user's work experience history in a paginated manner."
+    )
     public List<WorkExperienceResponse> getWorkExperience(
             @RequestHeader("Authorization") String token,
             @RequestParam(value = "page", defaultValue = "0", required = false) int page,
@@ -41,6 +43,10 @@ public class WorkExperienceController {
     }
 
     @PostMapping
+    @Operation(
+        summary = "Add a new work experience record",
+        description = "Add a new work experience record to the user's profile."
+    )
     public ResponseEntity<WorkExperienceResponse> createWorkExperience(
             @RequestHeader("Authorization") String token,
             @Valid @RequestBody WorkExperienceRequest request) {
@@ -53,6 +59,9 @@ public class WorkExperienceController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a work experience by its ID",
+    description = "Updates an existing work experience record, identified by its ID."
+    )
     public WorkExperienceResponse updateWorkExperience(
             @RequestHeader("Authorization") String token,
             @PathVariable Integer id,

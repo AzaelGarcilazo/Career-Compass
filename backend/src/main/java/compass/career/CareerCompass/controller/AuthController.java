@@ -3,6 +3,7 @@ package compass.career.CareerCompass.controller;
 import compass.career.CareerCompass.dto.*;
 import compass.career.CareerCompass.model.User;
 import compass.career.CareerCompass.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,8 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @Operation(summary = "Register a new user to the system",
+    description = "Create a new user account using the provided data.")
     public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
         LoginResponse response = authService.register(request);
         return ResponseEntity
@@ -28,12 +31,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Authenticate a user and log in",
+    description = "Validates a user's credentials to log in and continue."
+    )
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "Log out of the user session",
+    description = "Invalidates the user's current authentication token to securely log them out."
+    )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@RequestHeader("Authorization") String token) {
         // Remover "Bearer " del token si existe
@@ -42,12 +51,18 @@ public class AuthController {
     }
 
     @PostMapping("/password-recovery")
+    @Operation(summary = "Allow password recovery",
+    description = "Start the password recovery process for a user via their email."
+    )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void requestPasswordRecovery(@Valid @RequestBody PasswordRecoveryRequest request) {
         authService.requestPasswordRecovery(request);
     }
 
     @PutMapping("/change-password")
+    @Operation(summary = "Update your password",
+        description = "Allows a logged-in user to change their current password to a new one."
+    )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(
             @RequestHeader("Authorization") String token,
@@ -58,6 +73,9 @@ public class AuthController {
     }
 
     @PutMapping("/profile")
+    @Operation(summary = "Update profile information",
+    description = "Allows an authenticated user to update their profile information."
+    )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateProfile(
             @RequestHeader("Authorization") String token,
