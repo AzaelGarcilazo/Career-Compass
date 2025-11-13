@@ -4,13 +4,19 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.Collections;
 
 @Entity
 @Table(name = "credentials")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Credential {
+public class Credential implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,6 +29,49 @@ public class Credential {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @OneToOne(mappedBy = "credential", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "credential", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private User user;
+
+    // ESTE ES EL CAMBIO CRÍTICO - Ahora carga el rol desde la relación User
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (user != null && user.getRole() != null) {
+            // Convertir el rol a mayúsculas y agregar prefijo ROLE_
+            String roleName = user.getRole().getName().toUpperCase();
+            return Collections.singletonList(
+                    new SimpleGrantedAuthority("ROLE_" + roleName)
+            );
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public String getUsername() {
+        return user != null ? user.getEmail() : null;
+    }
+
+    @Override
+    public String getPassword() {
+        return this.password;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
 }

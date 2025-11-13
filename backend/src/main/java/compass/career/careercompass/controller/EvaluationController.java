@@ -8,9 +8,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.graphql.data.method.annotation.Argument;
-import org.springframework.graphql.data.method.annotation.ContextValue;
-import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -114,36 +111,63 @@ public class EvaluationController {
         return evaluationService.getEvaluationHistory(user.getId());
     }
 
-//    @GetMapping("/details/{evaluationId}")
-//    @Operation(
-//            summary = "Get evaluation detail",
-//            description = "Retrieves the complete details of a specific evaluation, including all questions answered by the user, the selected options, and the analysis results. This allows users to review their past test responses and see how they answered each question."
-//    )
-//    public ResponseEntity<EvaluationDetailResponse> getEvaluationDetail(
-//            @RequestHeader("Authorization") String token,
-//            @PathVariable Integer evaluationId) {
-//        String cleanToken = token.replace("Bearer ", "");
-//        User user = authService.getUserFromToken(cleanToken);
-//        EvaluationDetailResponse response = evaluationService.getEvaluationDetail(user.getId(), evaluationId);
-//        return ResponseEntity.ok(response);
-//    }
-
-    @QueryMapping
+    @GetMapping("/details/{evaluationId}")
     @Operation(
             summary = "Get evaluation detail",
-            description = "Retrieves the complete details of a specific evaluation via GraphQL"
+            description = "Retrieves the complete details of a specific evaluation, including all questions answered by the user, the selected options, and the analysis results. This allows users to review their past test responses and see how they answered each question."
     )
-    public EvaluationDetailResponse getEvaluationDetail(
-            @Argument Integer evaluationId,
-            @ContextValue(required = false) String authorization) {
-
-        if (authorization == null || authorization.isEmpty()) {
-            throw new RuntimeException("Authorization token is required");
-        }
-
-        String cleanToken = authorization.replace("Bearer ", "");
+    public ResponseEntity<EvaluationDetailResponse> getEvaluationDetail(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer evaluationId) {
+        String cleanToken = token.replace("Bearer ", "");
         User user = authService.getUserFromToken(cleanToken);
-
-        return evaluationService.getEvaluationDetail(user.getId(), evaluationId);
+        EvaluationDetailResponse response = evaluationService.getEvaluationDetail(user.getId(), evaluationId);
+        return ResponseEntity.ok(response);
     }
+
+//    @QueryMapping
+//    @Operation(
+//            summary = "Get personality test via GraphQL",
+//            description = "Retrieves the personality test questions"
+//    )
+//    public TestResponse getPersonalityTest() {
+//        return evaluationService.getPersonalityTest();
+//    }
+//
+//    @QueryMapping
+//    @Operation(
+//            summary = "Get vocational interests test via GraphQL",
+//            description = "Retrieves the vocational interests test questions"
+//    )
+//    public TestResponse getVocationalInterestsTest() {
+//        return evaluationService.getVocationalInterestsTest();
+//    }
+//
+//    @QueryMapping
+//    @Operation(
+//            summary = "Get cognitive skills test via GraphQL",
+//            description = "Retrieves the cognitive skills test questions"
+//    )
+//    public TestResponse getCognitiveSkillsTest() {
+//        return evaluationService.getCognitiveSkillsTest();
+//    }
+//
+//    @QueryMapping
+//    @Operation(
+//            summary = "Get evaluation detail",
+//            description = "Retrieves the complete details of a specific evaluation via GraphQL"
+//    )
+//    public EvaluationDetailResponse getEvaluationDetail(
+//            @Argument Integer evaluationId,
+//            @ContextValue(required = false) String authorization) {
+//
+//        if (authorization == null || authorization.isEmpty()) {
+//            throw new RuntimeException("Authorization token is required");
+//        }
+//
+//        String cleanToken = authorization.replace("Bearer ", "");
+//        User user = authService.getUserFromToken(cleanToken);
+//
+//        return evaluationService.getEvaluationDetail(user.getId(), evaluationId);
+//    }
 }
