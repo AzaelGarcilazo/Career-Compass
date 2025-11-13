@@ -98,8 +98,14 @@ public class SkillServiceImpl implements SkillService {
 
         Pageable pageable = PageRequest.of(page, pageSize);
 
-        return repository.findByUserId(userId, pageable).stream()
+        List<SkillResponse> skills = repository.findByUserId(userId, pageable).stream()
                 .map(SkillMapper::toResponse)
                 .collect(Collectors.toList());
+
+        if (skills.isEmpty()) {
+            throw new IllegalArgumentException("There are no skills registered for this user.");
+        }
+
+        return skills;
     }
 }

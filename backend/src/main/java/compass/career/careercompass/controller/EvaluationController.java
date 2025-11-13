@@ -1,14 +1,13 @@
 package compass.career.careercompass.controller;
 
 import compass.career.careercompass.dto.*;
-import compass.career.careercompass.model.User;
-import compass.career.careercompass.service.AuthService;
 import compass.career.careercompass.service.EvaluationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -22,7 +21,7 @@ import java.util.List;
 public class EvaluationController {
 
     private final EvaluationService evaluationService;
-    private final AuthService authService;
+    private final AuthenticationHelper authHelper;
 
     @GetMapping("/personality-test")
     @Operation(
@@ -39,10 +38,9 @@ public class EvaluationController {
             description = "Processes the user's responses to the personality test and generates an analysis using Azure Cognitive Services. Calculates the 5 personality dimensions (conscientiousness, openness, neuroticism, extraversion, agreeableness), performs sentiment analysis, and extracts key phrases. Results are stored in JSON format for later use in generating recommendations."
     )
     public ResponseEntity<EvaluationResultResponse> submitPersonalityTest(
-            @RequestHeader("Authorization") String token,
+            Authentication authentication,
             @Valid @RequestBody SubmitTestRequest request) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+        var user = authHelper.getAuthenticatedUser(authentication);
         EvaluationResultResponse response = evaluationService.submitPersonalityTest(user.getId(), request);
         return ResponseEntity
                 .created(URI.create("/api/v1/evaluations/history"))
@@ -64,10 +62,9 @@ public class EvaluationController {
             description = "Processes the vocational interests test responses and calculates affinity percentages with different professional areas. Identifies the user's top 5 vocational areas and stores them in the area_results table with their corresponding ranking. These results are fundamental for generating personalized career recommendations."
     )
     public ResponseEntity<EvaluationResultResponse> submitVocationalInterestsTest(
-            @RequestHeader("Authorization") String token,
+            Authentication authentication,
             @Valid @RequestBody SubmitTestRequest request) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+        var user = authHelper.getAuthenticatedUser(authentication);
         EvaluationResultResponse response = evaluationService.submitVocationalInterestsTest(user.getId(), request);
         return ResponseEntity
                 .created(URI.create("/api/v1/evaluations/history"))
@@ -89,10 +86,9 @@ public class EvaluationController {
             description = "Processes the cognitive skills test responses and calculates scores from 0-100 for each evaluated area (logical reasoning, memory, etc.). Determines the proficiency level (low, medium, high) for each skill and generates an overall average score. Results help identify the user's strengths and areas for improvement."
     )
     public ResponseEntity<EvaluationResultResponse> submitCognitiveSkillsTest(
-            @RequestHeader("Authorization") String token,
+            Authentication authentication,
             @Valid @RequestBody SubmitTestRequest request) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+        var user = authHelper.getAuthenticatedUser(authentication);
         EvaluationResultResponse response = evaluationService.submitCognitiveSkillsTest(user.getId(), request);
         return ResponseEntity
                 .created(URI.create("/api/v1/evaluations/history"))
@@ -104,10 +100,8 @@ public class EvaluationController {
             summary = "Get evaluation history",
             description = "Retrieves the complete history of evaluations completed by the user, ordered from most recent to oldest. Includes information for all types of completed tests (personality, vocational interests, and cognitive skills) with their completion dates and obtained scores."
     )
-    public List<EvaluationHistoryResponse> getEvaluationHistory(
-            @RequestHeader("Authorization") String token) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+    public List<EvaluationHistoryResponse> getEvaluationHistory(Authentication authentication) {
+        var user = authHelper.getAuthenticatedUser(authentication);
         return evaluationService.getEvaluationHistory(user.getId());
     }
 
@@ -117,57 +111,10 @@ public class EvaluationController {
             description = "Retrieves the complete details of a specific evaluation, including all questions answered by the user, the selected options, and the analysis results. This allows users to review their past test responses and see how they answered each question."
     )
     public ResponseEntity<EvaluationDetailResponse> getEvaluationDetail(
-            @RequestHeader("Authorization") String token,
+            Authentication authentication,
             @PathVariable Integer evaluationId) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+        var user = authHelper.getAuthenticatedUser(authentication);
         EvaluationDetailResponse response = evaluationService.getEvaluationDetail(user.getId(), evaluationId);
         return ResponseEntity.ok(response);
     }
-
-//    @QueryMapping
-//    @Operation(
-//            summary = "Get personality test via GraphQL",
-//            description = "Retrieves the personality test questions"
-//    )
-//    public TestResponse getPersonalityTest() {
-//        return evaluationService.getPersonalityTest();
-//    }
-//
-//    @QueryMapping
-//    @Operation(
-//            summary = "Get vocational interests test via GraphQL",
-//            description = "Retrieves the vocational interests test questions"
-//    )
-//    public TestResponse getVocationalInterestsTest() {
-//        return evaluationService.getVocationalInterestsTest();
-//    }
-//
-//    @QueryMapping
-//    @Operation(
-//            summary = "Get cognitive skills test via GraphQL",
-//            description = "Retrieves the cognitive skills test questions"
-//    )
-//    public TestResponse getCognitiveSkillsTest() {
-//        return evaluationService.getCognitiveSkillsTest();
-//    }
-//
-//    @QueryMapping
-//    @Operation(
-//            summary = "Get evaluation detail",
-//            description = "Retrieves the complete details of a specific evaluation via GraphQL"
-//    )
-//    public EvaluationDetailResponse getEvaluationDetail(
-//            @Argument Integer evaluationId,
-//            @ContextValue(required = false) String authorization) {
-//
-//        if (authorization == null || authorization.isEmpty()) {
-//            throw new RuntimeException("Authorization token is required");
-//        }
-//
-//        String cleanToken = authorization.replace("Bearer ", "");
-//        User user = authService.getUserFromToken(cleanToken);
-//
-//        return evaluationService.getEvaluationDetail(user.getId(), evaluationId);
-//    }
 }

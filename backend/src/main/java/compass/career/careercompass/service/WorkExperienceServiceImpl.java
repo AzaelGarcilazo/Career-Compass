@@ -34,7 +34,6 @@ public class WorkExperienceServiceImpl implements WorkExperienceService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        // ⚠️ VALIDAR LÓGICA DE FECHAS
         try {
             request.validateDateLogic();
         } catch (IllegalArgumentException e) {
@@ -60,7 +59,6 @@ public class WorkExperienceServiceImpl implements WorkExperienceService {
         WorkExperience entity = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new EntityNotFoundException("Work experience not found"));
 
-        // ⚠️ VALIDAR LÓGICA DE FECHAS
         try {
             request.validateDateLogic();
         } catch (IllegalArgumentException e) {
@@ -86,8 +84,14 @@ public class WorkExperienceServiceImpl implements WorkExperienceService {
 
         Pageable pageable = PageRequest.of(page, pageSize);
 
-        return repository.findByUserId(userId, pageable).stream()
+        List<WorkExperienceResponse> workExperiences = repository.findByUserId(userId, pageable).stream()
                 .map(WorkExperienceMapper::toResponse)
                 .collect(Collectors.toList());
+
+        if (workExperiences.isEmpty()) {
+            throw new IllegalArgumentException("There is no work experience registered for this user.");
+        }
+
+        return workExperiences;
     }
 }

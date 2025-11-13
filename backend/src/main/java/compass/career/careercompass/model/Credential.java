@@ -32,11 +32,9 @@ public class Credential implements UserDetails {
     @OneToOne(mappedBy = "credential", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private User user;
 
-    // ESTE ES EL CAMBIO CRÍTICO - Ahora carga el rol desde la relación User
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (user != null && user.getRole() != null) {
-            // Convertir el rol a mayúsculas y agregar prefijo ROLE_
             String roleName = user.getRole().getName().toUpperCase();
             return Collections.singletonList(
                     new SimpleGrantedAuthority("ROLE_" + roleName)

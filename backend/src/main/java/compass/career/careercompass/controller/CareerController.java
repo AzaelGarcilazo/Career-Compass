@@ -1,8 +1,6 @@
 package compass.career.careercompass.controller;
 
 import compass.career.careercompass.dto.*;
-import compass.career.careercompass.model.User;
-import compass.career.careercompass.service.AuthService;
 import compass.career.careercompass.service.CareerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -10,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -23,17 +22,15 @@ import java.util.List;
 public class CareerController {
 
     private final CareerService careerService;
-    private final AuthService authService;
+    private final AuthenticationHelper authHelper;
 
     @PostMapping("/recommendations")
     @Operation(
             summary = "Get personalized career recommendations",
             description = "Generates or retrieves career recommendations based on the user's evaluation results (personality, vocational interests, and cognitive skills). Uses Groq AI to generate personalized recommendations for the first time. Recommendations are stored in cache for 1 hour and in the database permanently."
     )
-    public List<CareerRecommendationResponse> getRecommendedCareers(
-            @RequestHeader("Authorization") String token) {
-        String cleanToken = token.replace("Bearer ", "");
-        User user = authService.getUserFromToken(cleanToken);
+    public List<CareerRecommendationResponse> getRecommendedCareers(Authentication authentication) {
+        var user = authHelper.getAuthenticatedUser(authentication);
         return careerService.getRecommendedCareers(user.getId());
     }
 

@@ -7,13 +7,16 @@ import compass.career.careercompass.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,9 +25,10 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final CredentialRepository credentialRepository;
     private final RoleRepository roleRepository;
-    private final SessionRepository sessionRepository;
     private final PasswordRecoveryRepository passwordRecoveryRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
 
     @Override
     @Transactional
@@ -58,48 +62,31 @@ public class AuthServiceImpl implements AuthService {
         User user = AuthMapper.toEntity(request, credential, role);
         user = userRepository.save(user);
 
-        // Crear sesión
-        String token = UUID.randomUUID().toString();
-        Session session = new Session();
-        session.setUser(user);
-        session.setToken(token);
-        session.setActive(true);
-        sessionRepository.save(session);
+        // Generar token JWT
+        String jwtToken = jwtService.generateToken(credential);
 
-        return AuthMapper.toLoginResponse(user, token);
+        return AuthMapper.toLoginResponse(user, jwtToken);
     }
 
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        // Autenticar con Spring Security
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
+
         // Buscar usuario por email
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new EntityNotFoundException("Invalid credentials"));
 
-        // Verificar contraseña usando BCrypt
-        if (!passwordEncoder.matches(request.getPassword(), user.getCredential().getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials");
-        }
+        // Generar token JWT
+        String jwtToken = jwtService.generateToken(user.getCredential());
 
-        // Crear nueva sesión
-        String token = UUID.randomUUID().toString();
-        Session session = new Session();
-        session.setUser(user);
-        session.setToken(token);
-        session.setActive(true);
-        sessionRepository.save(session);
-
-        return AuthMapper.toLoginResponse(user, token);
-    }
-
-    @Override
-    @Transactional
-    public void logout(String token) {
-        Session session = sessionRepository.findByToken(token)
-                .orElseThrow(() -> new EntityNotFoundException("Session not found"));
-
-        session.setActive(false);
-        sessionRepository.save(session);
+        return AuthMapper.toLoginResponse(user, jwtToken);
     }
 
     @Override
@@ -108,7 +95,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new EntityNotFoundException("Email not found"));
 
-        String token = UUID.randomUUID().toString();
+        // Generar token para recuperación (esto puede seguir usando UUID para emails)
+        String token = java.util.UUID.randomUUID().toString();
         PasswordRecovery recovery = new PasswordRecovery();
         recovery.setUser(user);
         recovery.setToken(token);
@@ -150,10 +138,5 @@ public class AuthServiceImpl implements AuthService {
         return userRepository.save(user);
     }
 
-    @Override
-    public User getUserFromToken(String token) {
-        Session session = sessionRepository.findByTokenAndActiveTrue(token)
-                .orElseThrow(() -> new EntityNotFoundException("Invalid or expired token"));
-        return session.getUser();
-    }
+
 }
