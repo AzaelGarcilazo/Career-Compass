@@ -1,10 +1,16 @@
 package compass.career.careercompass.controller;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AccountStatusException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -20,6 +26,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.SocketTimeoutException;
+import java.security.SignatureException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -214,9 +221,6 @@ public class RestExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
-    /**
-     * Maneja errores de servidor HTTP (5xx) al consumir APIs externas
-     */
     @ExceptionHandler(HttpServerErrorException.class)
     public ResponseEntity<Map<String, Object>> handleHttpServerError(HttpServerErrorException ex) {
         String message = "External API server error. The service may be temporarily unavailable";
@@ -232,9 +236,6 @@ public class RestExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
-    /**
-     * Maneja timeouts y errores de conexión a APIs externas
-     */
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<Map<String, Object>> handleResourceAccessException(ResourceAccessException ex) {
         String message = "Cannot connect to external service";
@@ -266,9 +267,6 @@ public class RestExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 
-    /**
-     * Maneja timeouts de socket directamente
-     */
     @ExceptionHandler(SocketTimeoutException.class)
     public ResponseEntity<Map<String, Object>> handleSocketTimeout(SocketTimeoutException ex) {
         String message = "Request timeout. The operation took too long to complete. " +
@@ -389,6 +387,193 @@ public class RestExceptionHandler {
 
         Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    // ============= EXCEPCIONES DE SEGURIDAD Y AUTENTICACIÓN =============
+
+    /**
+     * Maneja credenciales inválidas (email/password incorrectos)
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "INVALID_CREDENTIALS",
+                "The username or password is incorrect",
+                HttpStatus.UNAUTHORIZED
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    /**
+     * Maneja cuenta bloqueada o deshabilitada
+     */
+    @ExceptionHandler(AccountStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountStatus(AccountStatusException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "ACCOUNT_LOCKED",
+                "The account is locked or disabled",
+                HttpStatus.FORBIDDEN
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Maneja acceso denegado por permisos insuficientes
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "ACCESS_DENIED",
+                "You are not authorized to access this resource",
+                HttpStatus.FORBIDDEN
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Maneja firma JWT inválida
+     */
+    @ExceptionHandler(SignatureException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidJwtSignature(SignatureException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "INVALID_JWT_SIGNATURE",
+                "The JWT signature is invalid",
+                HttpStatus.FORBIDDEN
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Maneja JWT expirado
+     */
+    @ExceptionHandler(ExpiredJwtException.class)
+    public ResponseEntity<Map<String, Object>> handleExpiredJwt(ExpiredJwtException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "JWT_EXPIRED",
+                "The JWT token has expired. Please login again",
+                HttpStatus.FORBIDDEN
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("expiredAt", ex.getClaims().getExpiration());
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Maneja cualquier excepción JWT genérica no capturada
+     */
+    @ExceptionHandler(io.jsonwebtoken.JwtException.class)
+    public ResponseEntity<Map<String, Object>> handleJwtException(io.jsonwebtoken.JwtException ex) {
+        String message = "Invalid JWT token";
+        String code = "INVALID_JWT";
+
+        // Detectar tipos específicos de errores JWT
+        String exMessage = ex.getMessage().toLowerCase();
+
+        if (exMessage.contains("malformed")) {
+            message = "Malformed JWT token. The token format is invalid";
+            code = "MALFORMED_JWT";
+        } else if (exMessage.contains("unsupported")) {
+            message = "Unsupported JWT token";
+            code = "UNSUPPORTED_JWT";
+        } else if (exMessage.contains("claims")) {
+            message = "JWT claims string is empty";
+            code = "EMPTY_JWT_CLAIMS";
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.FORBIDDEN);
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Maneja excepciones genéricas no capturadas (fallback)
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        // Log del error para debugging
+        ex.printStackTrace();
+
+        Map<String, Object> body = buildErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "An unexpected error occurred. Please try again later",
+                HttpStatus.INTERNAL_SERVER_ERROR
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+            body.put("exceptionType", ex.getClass().getSimpleName());
+        }
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    /**
+     * Maneja intentos de acceso sin autenticación
+     * Se lanza cuando se intenta acceder a un endpoint protegido sin token o con token inválido
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException ex) {
+        String message = "Authentication is required to access this resource";
+        String code = "AUTHENTICATION_REQUIRED";
+
+        // Detectar casos específicos
+        String exMessage = ex.getMessage().toLowerCase();
+
+        if (exMessage.contains("full authentication is required")) {
+            message = "You must be logged in to access this resource. Please provide a valid authentication token";
+            code = "AUTHENTICATION_REQUIRED";
+        } else if (exMessage.contains("credentials")) {
+            message = "Invalid authentication credentials";
+            code = "INVALID_CREDENTIALS";
+        }
+
+        Map<String, Object> body = buildErrorResponse(code, message, HttpStatus.UNAUTHORIZED);
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    /**
+     * Maneja intento de acceso sin credenciales o con credenciales insuficientes
+     */
+    @ExceptionHandler(InsufficientAuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleInsufficientAuthentication(InsufficientAuthenticationException ex) {
+        Map<String, Object> body = buildErrorResponse(
+                "INSUFFICIENT_AUTHENTICATION",
+                "Full authentication is required to access this resource. Please login first",
+                HttpStatus.UNAUTHORIZED
+        );
+
+        if (isDevelopmentMode()) {
+            body.put("details", ex.getMessage());
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
     // ============= MÉTODOS AUXILIARES =============

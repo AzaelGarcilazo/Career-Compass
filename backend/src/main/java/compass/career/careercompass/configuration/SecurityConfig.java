@@ -52,7 +52,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        // Rutas que requieren rol UNIVERSITY_STUDENT
+                        // Rutas del rol UNIVERSITY_STUDENT
                         .requestMatchers("/api/v1/evaluations/**").hasRole("UNIVERSITY_STUDENT")
                         .requestMatchers("/api/v1/favorite-careers/**").hasRole("UNIVERSITY_STUDENT")
                         .requestMatchers("/api/v1/favorite-specializations/**").hasRole("UNIVERSITY_STUDENT")
@@ -61,9 +61,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/academic/**").hasRole("UNIVERSITY_STUDENT")
                         .requestMatchers("/api/v1/work-experience/**").hasRole("UNIVERSITY_STUDENT")
 
-                        // Rutas que requieren rol ADMIN
+                        // Rutas del rol ADMIN
                         .requestMatchers("/api/v1/careers/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/specializations/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/tests/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )

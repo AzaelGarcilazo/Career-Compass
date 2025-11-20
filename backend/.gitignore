@@ -3,7 +3,11 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-backend/src/main/resources/application.properties
+
+# Variables de entorno - IMPORTANTE
+.env
+.env.local
+.env.production
 
 ### STS ###
 .apt_generated
@@ -32,3 +36,5 @@ build/
 
 ### VS Code ###
 .vscode/
+
+backend/src/main/resources/application.properties
